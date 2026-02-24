@@ -1,3 +1,19 @@
-idf_component_register(SRCS "play_sdcard_music_example.c"
+set (SOURCES
+    "input_processor.c"
+    "main.c"
+    "pi4ioe5v6416.c"
+    "rotaries.c"
+    "sound_stream.c"
+)
+
+idf_component_register(SRCS ${SOURCES}
                     INCLUDE_DIRS "."
-                    REQUIRES audio_board audio_hal audio_pipeline esp_peripherals audio_stream esp-adf-libs pi4ioe5v6416)
+                    REQUIRES 
+                    audio_board 
+                    audio_hal 
+                    audio_pipeline 
+                    audio_stream 
+                    esp_adc
+                    esp-adf-libs 
+                    esp_peripherals 
+                    )

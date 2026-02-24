@@ -1,23 +1,7 @@
 #include "pi4ioe5v6416.h"
 #include "esp_log.h"
 
-#define REG_INPUT_PORT0      0x00
-#define REG_INPUT_PORT1      0x01
-#define REG_OUTPUT_PORT0     0x02
-#define REG_OUTPUT_PORT1     0x03
-#define REG_POLARITY_PORT0   0x04
-#define REG_POLARITY_PORT1   0x05
-#define REG_CONFIG_PORT0     0x06
-#define REG_CONFIG_PORT1     0x07
-
-#define REG_INT_MASK_PORT0     0x4A
-#define REG_INT_MASK_PORT1     0x4B
-#define REG_INT_STATUS_PORT0   0x4C
-#define REG_INT_STATUS_PORT1   0x4D
-
-#define PI4IOE_ADDR 0x40  // or 0x42 depending on the state of the ADDR pin
-
-static const char *TAG = "PI4IOE5V6416";
+static const char *TAG = "pi4ioe5v6416";
 
 esp_err_t get_i2c_pins(i2c_port_t port, i2c_config_t *i2c_config);
 
@@ -36,43 +20,40 @@ int pi4ioe5v6416_init(pi4ioe5v6416_t *dev)
         return res;  // Failed to get I2C pins
     }
     dev->i2c_handle = i2c_bus_create(I2C_NUM_0, &es_i2c_cfg);
-    dev->address = PI4IOE_ADDR;
 
     esp_err_t err;
     uint8_t dummy;
 
     // 1️⃣ Check device presence (read input register)
-    err = pi4ioe5v6416_read_reg(dev, REG_INPUT_PORT0, &dummy);
-    if (err != ESP_OK) {
-        return err;  // Device not responding
-    }
+    err = pi4ioe5v6416_read_reg(dev, PI4IOE5V6416_INPUT_PORT0, &dummy);
+    if (err != ESP_OK) return err;  // Device not responding
 
     // 2️⃣ Set all pins to INPUT (safe default)
-    err = pi4ioe5v6416_write_reg(dev, REG_CONFIG_PORT0, 0xFF);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_CONFIG_PORT0, 0xFF);
     if (err != ESP_OK) return err;
 
-    err = pi4ioe5v6416_write_reg(dev, REG_CONFIG_PORT1, 0xFF);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_CONFIG_PORT1, 0xFF);
     if (err != ESP_OK) return err;
 
     // 3️⃣ Clear output registers
-    err = pi4ioe5v6416_write_reg(dev, REG_OUTPUT_PORT0, 0x00);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_OUTPUT_PORT0, 0x00);
     if (err != ESP_OK) return err;
 
-    err = pi4ioe5v6416_write_reg(dev, REG_OUTPUT_PORT1, 0x00);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_OUTPUT_PORT1, 0x00);
     if (err != ESP_OK) return err;
 
     // 4 Default polaity
-    err = pi4ioe5v6416_write_reg(dev, REG_POLARITY_PORT0, 0x00);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_POLARITY_PORT0, 0x00);
     if (err != ESP_OK) return err;
 
-    err = pi4ioe5v6416_write_reg(dev, REG_POLARITY_PORT1, 0x00);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_POLARITY_PORT1, 0x00);
     if (err != ESP_OK) return err;
 
     // 6 Mask all interrupts initially
-    err = pi4ioe5v6416_write_reg(dev, REG_INT_MASK_PORT0, 0xFF);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_INT_MASK_PORT0, 0xFF);
     if (err != ESP_OK) return err;
 
-    err = pi4ioe5v6416_write_reg(dev, REG_INT_MASK_PORT1, 0xFF);
+    err = pi4ioe5v6416_write_reg(dev, PI4IOE5V6416_INT_MASK_PORT1, 0xFF);
     if (err != ESP_OK) return err;
 
     return ESP_OK;
@@ -88,9 +69,10 @@ esp_err_t pi4ioe5v6416_read_reg(pi4ioe5v6416_t *dev, uint8_t reg_add, uint8_t *p
     return i2c_bus_read_bytes(dev->i2c_handle, dev->address, &reg_add, sizeof(reg_add), p_data, 1);
 }
 
+
 esp_err_t pi4ioe5v6416_set_direction(pi4ioe5v6416_t *dev, uint8_t pin, bool output)
 {
-    uint8_t reg = (pin < 8) ? REG_CONFIG_PORT0 : REG_CONFIG_PORT1;
+    uint8_t reg = (pin < 8) ? PI4IOE5V6416_CONFIG_PORT0 : PI4IOE5V6416_CONFIG_PORT1;
     uint8_t bit = pin % 8;
 
     uint8_t val;
@@ -107,7 +89,7 @@ esp_err_t pi4ioe5v6416_set_direction(pi4ioe5v6416_t *dev, uint8_t pin, bool outp
 
 esp_err_t pi4ioe5v6416_write_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool level)
 {
-    uint8_t reg = (pin < 8) ? REG_OUTPUT_PORT0 : REG_OUTPUT_PORT1;
+    uint8_t reg = (pin < 8) ? PI4IOE5V6416_OUTPUT_PORT0 : PI4IOE5V6416_OUTPUT_PORT1;
     uint8_t bit = pin % 8;
 
     uint8_t val;
@@ -124,7 +106,7 @@ esp_err_t pi4ioe5v6416_write_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool level)
 
 esp_err_t pi4ioe5v6416_read_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool *level)
 {
-    uint8_t reg = (pin < 8) ? REG_INPUT_PORT0 : REG_INPUT_PORT1;
+    uint8_t reg = (pin < 8) ? PI4IOE5V6416_INPUT_PORT0 : PI4IOE5V6416_INPUT_PORT1;
     uint8_t bit = pin % 8;
 
     uint8_t val;
@@ -137,7 +119,7 @@ esp_err_t pi4ioe5v6416_read_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool *level)
 
 esp_err_t pi4ioe5v6416_enable_interrupt(pi4ioe5v6416_t *dev, uint8_t pin)
 {
-    uint8_t reg = (pin < 8) ? REG_INT_MASK_PORT0 : REG_INT_MASK_PORT1;
+    uint8_t reg = (pin < 8) ? PI4IOE5V6416_INT_MASK_PORT0 : PI4IOE5V6416_INT_MASK_PORT1;
     uint8_t bit = pin % 8;
 
     uint8_t val;
