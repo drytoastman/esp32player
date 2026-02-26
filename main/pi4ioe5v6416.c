@@ -104,7 +104,7 @@ esp_err_t pi4ioe5v6416_write_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool level)
 }
 
 
-esp_err_t pi4ioe5v6416_read_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool *level)
+bool pi4ioe5v6416_read_pin(pi4ioe5v6416_t *dev, uint8_t pin)
 {
     uint8_t reg = (pin < 8) ? PI4IOE5V6416_INPUT_PORT0 : PI4IOE5V6416_INPUT_PORT1;
     uint8_t bit = pin % 8;
@@ -112,8 +112,7 @@ esp_err_t pi4ioe5v6416_read_pin(pi4ioe5v6416_t *dev, uint8_t pin, bool *level)
     uint8_t val;
     pi4ioe5v6416_read_reg(dev, reg, &val);
 
-    *level = (val >> bit) & 0x01;
-    return ESP_OK;
+    return (val >> bit) & 0x01;
 }
 
 

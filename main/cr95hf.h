@@ -14,6 +14,10 @@
 #define RSP_SUCCESS 0x00
 #define RSP_DATA 0x80
 
+// SPI Commans
+#define SPI_WRITE 0x00
+#define SPI_READ 0x02
+
 // Protocol Codes
 #define PROTO_OFF 0x00
 #define PROTO_ISO14443A 0x02

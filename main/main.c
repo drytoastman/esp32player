@@ -1,6 +1,7 @@
 
 #include "all.h"
 #include "esp_rom_sys.h"
+#include "driver/spi_master.h"
 
 static const char *TAG = "MAIN";
 
@@ -50,13 +51,13 @@ pi4ioe5v6416_t iox = {
     .address = PI4IOE_ADDR,
 };
 
-cr95hfv5_t cr95hf_dev = {
+cr95hfv5_t cr95hf = {
     .cs = 12,
     .irq_in = 7,
     .irq_out = 8
 };
 
-#include "driver/spi_master.h"
+SemaphoreHandle_t spi_bus_mutex;
 
 void app_main(void)
 {
@@ -82,13 +83,18 @@ void app_main(void)
         .max_transfer_sz = 1024 // cr95h can send up to 528 bytes of data
     };
     ESP_ERROR_CHECK(spi_bus_initialize(VSPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    spi_bus_mutex = xSemaphoreCreateMutex();
+    if (spi_bus_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create SPI bus mutex");
+    }
 
-    cr95hfv5_init(&cr95hf_dev);
-    cr95hf_info(&cr95hf_dev);
+    cr95hfv5_init(&cr95hf);
+    vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
+    cr95hf_info(&cr95hf);
 
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 1024, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
     vTaskDelay(pdMS_TO_TICKS(1000));
     ESP_LOGI(TAG, "Free internal memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);

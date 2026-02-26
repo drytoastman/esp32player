@@ -9,14 +9,24 @@ static const char *TAG = "digital";
 
 pcnt_unit_handle_t volume_pcnt, rightknob_pcnt;
 
-void turn_off_pa() {
-    ESP_LOGI(TAG, "Turning off PA");
-    pi4ioe5v6416_write_pin(&iox, input_params.iox.power, 0);
+void pcactl(bool level) {
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.pactl, level);
 }
 
-void turn_on_pa() {
-    ESP_LOGI(TAG, "Turning on PA");
-    pi4ioe5v6416_write_pin(&iox, input_params.iox.power, 1);
+void nfc_cs(bool level) {
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_cs, level);
+}
+
+void nfc_irq(bool level) {
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_irq, level);
+}
+
+bool nfc_irq_check() {
+    return pi4ioe5v6416_read_pin(&iox, input_params.iox.nfc_irq);
+}
+
+void display_cs(int display, bool level) {
+    pi4ioe5v6416_write_pin(&iox, display, level);
 }
 
 
@@ -90,13 +100,7 @@ void digital_init()
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_OUTPUT_PORT1,      0xFF);
     vTaskDelay(pdMS_TO_TICKS(1)); // Short delay to ensure pins are set before proceeding with SPI transactions
 
-    pi4ioe5v6416_write_pin(&iox, 6, 0); // Mute audio initially
-    pi4ioe5v6416_write_pin(&iox, 7, 0); // Set irqin low for CR95HF
-    esp_rom_delay_us(20);
-    pi4ioe5v6416_write_pin(&iox, 7, 1); // Set irqin high for CR95HF
-    vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
-
-
+    pcactl(0);
     volume_pcnt    = rotary_init(input_params.gpio.volume_a, input_params.gpio.volume_b);
     rightknob_pcnt = rotary_init(input_params.gpio.right_a, input_params.gpio.right_b);
 }
@@ -195,10 +199,10 @@ void digital_processor(void *ignored)
                 current_mute = !current_mute; // Toggle mute state
                 if (!current_mute) { // inverted
                     ESP_LOGI(TAG, "Muting audio");
-                    turn_off_pa();
+                    pcactl(0);
                 } else {
                     ESP_LOGI(TAG, "Unmuting audio");
-                    turn_on_pa();
+                    pcactl(1);
                 }
             }
         }

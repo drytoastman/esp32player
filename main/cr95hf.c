@@ -3,8 +3,10 @@
 #include "all.h"
 #include "esp_rom_sys.h"
 
+static char *TAG = "cr95hf";
+
 void cr95hfv5_init(cr95hfv5_t *dev) {
-    ESP_LOGI("CR95HF", "Add device");
+    ESP_LOGI(TAG, "Add device");
 
     ESP_ERROR_CHECK(spi_bus_add_device(VSPI_HOST, &(spi_device_interface_config_t) {
         .clock_speed_hz = 2000000,  // start conservative (e.g. 2 MHz)
@@ -12,49 +14,84 @@ void cr95hfv5_init(cr95hfv5_t *dev) {
         .spics_io_num = -1,
         .queue_size = 3
     }, &dev->spi_handle));
+
+    // 'wake' NFC chip
+    nfc_irq(0);
+    esp_rom_delay_us(20);
+    nfc_irq(1);
 }
 
-void cr95hf_info(cr95hfv5_t *dev) {
-    // Example: Send IDN command
-    // uint8_t cmd = CMD_IDN;
-    char out[3] = { 0, CMD_IDN, 0 };
-    char buffer[18] = {0}; // Buffer for response;
+
+void cr95hf_wait() {
+    while (1) {
+        if (!nfc_irq_check()) break; // NFC irq_out went low
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+
+void cr95hf_tx(cr95hfv5_t *dev, char *tx, int tx_len) {
     spi_transaction_t t = {
-        .length = 3 * 8,
-        .tx_buffer = &out,
-        .rx_buffer = &buffer
+        .length = tx_len * 8,
+        .tx_buffer = tx,
+        .rx_buffer = NULL,
+        .rxlength = 0
     };
 
-    ESP_LOGI("CR95HF", "Starting IDN transaction...");
-
-    pi4ioe5v6416_write_pin(&iox, dev->cs, 0); // CS
-    esp_rom_delay_us(10);
-    ESP_ERROR_CHECK(spi_device_transmit(dev->spi_handle, &t));
-    pi4ioe5v6416_write_pin(&iox, dev->cs, 1); // CS
-    while (0) {
-        bool read;
-        pi4ioe5v6416_read_pin(&iox,dev->irq_out,&read);
-        if (!read) break;
-        vTaskDelay(pdMS_TO_TICKS(1));
-        // Wait for IRQ out to go high, indicating data is ready
+    if (xSemaphoreTake(spi_bus_mutex, pdMS_TO_TICKS(MAX_SPI_WAIT_MS)) == pdTRUE) {
+        nfc_cs(0);
+        esp_rom_delay_us(10);
+        ESP_ERROR_CHECK(spi_device_transmit(dev->spi_handle, &t));
+        nfc_cs(1);
+        xSemaphoreGive(spi_bus_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to acquire SPI bus mutex");
     }
-    vTaskDelay(pdMS_TO_TICKS(20));
+}
 
-    char read[18] = { 0 };
-    read[0] = 0x02;
 
-    t.tx_buffer = &read;
-    memset(t.rx_buffer, 0, sizeof(buffer));
-    t.length = 18 * 8; // Expecting 16 bytes of data
-    t.rxlength = 0;
+char buf[530];
+void cr95hf_rx(cr95hfv5_t *dev, char *rx, int *rx_len) {
+    int response_code;
+    char read[1] = {SPI_READ};
 
-    pi4ioe5v6416_write_pin(&iox, dev->cs, 0); // CS
-    esp_rom_delay_us(10);
-    ESP_ERROR_CHECK(spi_device_transmit(dev->spi_handle, &t));
-    pi4ioe5v6416_write_pin(&iox, dev->cs, 1); // CS
+    spi_transaction_t t = {
+        .length = 1 * 8,
+        .tx_buffer = &read,
+        .rx_buffer = rx,
+        .rxlength = 0
+    };
 
-    ESP_LOGI("CR95HF", "Received %d bits", t.rxlength);
-    for (int i = 0; i < 18; i++) {
-        ESP_LOGI("CR95HF", "Received byte %d: 0x%X %c", i, buffer[i],buffer[i]);
+    if (xSemaphoreTake(spi_bus_mutex, pdMS_TO_TICKS(MAX_SPI_WAIT_MS)) == pdTRUE) {
+        nfc_cs(0);
+        esp_rom_delay_us(10);
+        t.length = 3 * 8; // read the junk, response and length byte
+        ESP_ERROR_CHECK(spi_device_transmit(dev->spi_handle, &t));
+
+        response_code = rx[1];
+        *rx_len = rx[2];
+
+        // tx len bytes to get the data
+        t.length = *rx_len * 8;
+        t.rxlength = 0;
+        t.tx_buffer = NULL;
+
+        ESP_ERROR_CHECK(spi_device_transmit(dev->spi_handle, &t));
+        nfc_cs(1);
+        xSemaphoreGive(spi_bus_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to acquire SPI bus mutex");
     }
+}
+
+
+void cr95hf_info(cr95hfv5_t *dev) {
+    char out[3] = { 0, CMD_IDN, 0 };
+    cr95hf_tx(dev, out, sizeof(out));
+    cr95hf_wait();
+
+    int datalen;
+    cr95hf_rx(dev, buf, &datalen);
+
+    ESP_LOGI(TAG, "IDN (%d) '%s'", datalen, buf);
 }
