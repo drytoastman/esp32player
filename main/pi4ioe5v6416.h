@@ -5,6 +5,8 @@
 #include "esp_err.h"
 #include <stdint.h>
 
+#define PI4IOE_ADDR 0x40  // or 0x42 depending on the state of the ADDR pin
+
 #define PI4IOE5V6416_INPUT_PORT0      0x00
 #define PI4IOE5V6416_INPUT_PORT1      0x01
 #define PI4IOE5V6416_OUTPUT_PORT0     0x02

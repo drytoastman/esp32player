@@ -53,6 +53,10 @@ void sound_main(void *inputParameters)
     ESP_LOGI(TAG, "[3.2] Create i2s stream to write data to codec chip");
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
+    //i2s_cfg.buffer_len = I2S_STREAM_BUF_SIZE*2;
+    //i2s_cfg.out_rb_size = I2S_STREAM_RINGBUFFER_SIZE*2;
+    i2s_cfg.chan_cfg.dma_desc_num = 8;
+    i2s_cfg.chan_cfg.dma_frame_num = 512;
     i2s_stream_writer = i2s_stream_init(&i2s_cfg);
 
     /*
