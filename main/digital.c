@@ -208,6 +208,9 @@ void digital_processor(void *ignored)
         }
         if (current.iox.right != previous.iox.right) {
             ESP_LOGI(TAG, "IOX Right pin changed to: %d", current.iox.right);
+            if (current.iox.right) {
+                ht16d35a_try(ht16d35a, 0);
+            }
         }
         if (current.iox.nfc_irq != previous.iox.nfc_irq) {
             ESP_LOGI(TAG, "IOX NFC IRQ pin changed to: %d", current.iox.nfc_irq);

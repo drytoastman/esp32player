@@ -2,6 +2,7 @@ set (SOURCES
     "analog.c"
     "cr95hf.c"
     "digital.c"
+    "ht16d35a.c"
     "main.c"
     "pi4ioe5v6416.c"
     "sound_stream.c"

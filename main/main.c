@@ -51,12 +51,7 @@ pi4ioe5v6416_t iox = {
     .address = PI4IOE_ADDR,
 };
 
-cr95hfv5_t cr95hf = {
-    .cs = 12,
-    .irq_in = 7,
-    .irq_out = 8
-};
-
+spi_device_handle_t cr95hf, ht16d35a;
 SemaphoreHandle_t spi_bus_mutex;
 
 void app_main(void)
@@ -65,6 +60,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Free spiram memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
 
     esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("spi_hal", ESP_LOG_DEBUG);
     esp_log_level_set("spi_master", ESP_LOG_DEBUG);
     esp_log_level_set("spi_slave", ESP_LOG_DEBUG);
     esp_log_level_set("spi", ESP_LOG_DEBUG);
@@ -80,7 +76,7 @@ void app_main(void)
         .sclk_io_num = GPIO_NUM_2,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 1024 // cr95h can send up to 528 bytes of data
+        .max_transfer_sz = 0 // cr95h can send up to 528 bytes of data
     };
     ESP_ERROR_CHECK(spi_bus_initialize(VSPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
     spi_bus_mutex = xSemaphoreCreateMutex();
@@ -88,13 +84,15 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to create SPI bus mutex");
     }
 
-    cr95hfv5_init(&cr95hf);
+    //cr95hf_init(&cr95hf);
     vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
-    cr95hf_info(&cr95hf);
+    //cr95hf_info(cr95hf);
+
+    ht16d35a_init(&ht16d35a);
 
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 1024, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
+    //xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
     vTaskDelay(pdMS_TO_TICKS(1000));
     ESP_LOGI(TAG, "Free internal memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
