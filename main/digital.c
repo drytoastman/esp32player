@@ -26,7 +26,11 @@ bool nfc_irq_check() {
 }
 
 void display_cs(int display, bool level) {
-    pi4ioe5v6416_write_pin(&iox, display, level);
+    if ((display < 0) || (display >= 4)) {
+        ESP_LOGE(TAG, "display cs out of range (%d)", display);
+        return;
+    }
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.display[display], level);
 }
 
 
@@ -209,7 +213,7 @@ void digital_processor(void *ignored)
         if (current.iox.right != previous.iox.right) {
             ESP_LOGI(TAG, "IOX Right pin changed to: %d", current.iox.right);
             if (current.iox.right) {
-                ht16d35a_try(ht16d35a, 0);
+                ht16d35a_poke(ht16d35a);
             }
         }
         if (current.iox.nfc_irq != previous.iox.nfc_irq) {
@@ -222,7 +226,8 @@ void digital_processor(void *ignored)
             ESP_LOGI(TAG, "IOX Tilt pin changed to: %d", current.iox.tilt);
         }
         if (current.iox.power != previous.iox.power) {
-            ESP_LOGI(TAG, "IOX Power pin changed to: %d", current.iox.power);
+            // ESP_LOGI(TAG, "IOX Power pin changed to: %d", current.iox.power);
+            // Noisy when warm?
         }
         if (current.iox.plug_stat != previous.iox.plug_stat) {
             ESP_LOGI(TAG, "IOX Plug Stat pin changed to: %d", current.iox.plug_stat);

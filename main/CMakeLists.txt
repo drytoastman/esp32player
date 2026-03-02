@@ -6,6 +6,8 @@ set (SOURCES
     "main.c"
     "pi4ioe5v6416.c"
     "sound_stream.c"
+    "webserver.c"
+    "wifi.c"
 )
 
 idf_component_register(SRCS ${SOURCES}
@@ -18,4 +20,5 @@ idf_component_register(SRCS ${SOURCES}
                     esp_adc
                     esp-adf-libs
                     esp_peripherals
+                    esp_http_server
                     )

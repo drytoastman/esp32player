@@ -41,10 +41,7 @@ typedef struct {
     int night_green;
     int night_blue;
     struct {
-        int display_0;
-        int display_1;
-        int display_2;
-        int display_3;
+        int display[4];
         int pactl;
         int nfc_irq;
         int nfc_cs;
@@ -74,6 +71,8 @@ void nfc_irq(bool level);
 bool nfc_irq_check();
 void display_cs(int display, bool level);
 
+void start_wifi(void);
+void start_webserver();
 void sound_main(void *ignored);
 
 #endif

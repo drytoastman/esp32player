@@ -36,10 +36,7 @@ output_cfg output_params = {
     .night_blue = GPIO_NUM_19,
 
     .iox = {
-        .display_0 = 0,
-        .display_1 = 1,
-        .display_2 = 2,
-        .display_3 = 3,
+        .display = { 3, 2, 1, 0 },
         .pactl = 6,
         .nfc_irq = 7,
         .nfc_cs = 12,
@@ -84,9 +81,11 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to create SPI bus mutex");
     }
 
-    //cr95hf_init(&cr95hf);
+    /*
+    cr95hf_init(&cr95hf);
     vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
-    //cr95hf_info(cr95hf);
+    cr95hf_info(cr95hf);
+    */
 
     ht16d35a_init(&ht16d35a);
 
@@ -94,8 +93,20 @@ void app_main(void)
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 1024, NULL, 5, NULL, 1);
     //xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
+    start_wifi();
+    start_webserver();
+
     vTaskDelay(pdMS_TO_TICKS(1000));
     ESP_LOGI(TAG, "Free internal memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
     ESP_LOGI(TAG, "Free spiram memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
+
+    /**
+    while (1) {
+        char buffer[1024];
+        vTaskGetRunTimeStats(buffer);
+        printf("%s\n", buffer);
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
+        */
 }
 
