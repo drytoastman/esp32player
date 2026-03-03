@@ -7,20 +7,6 @@ esp_err_t get_i2c_pins(i2c_port_t port, i2c_config_t *i2c_config);
 
 int pi4ioe5v6416_init(pi4ioe5v6416_t *dev)
 {
-    esp_err_t res;
-    i2c_config_t es_i2c_cfg = {
-        .mode = I2C_MODE_MASTER,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000
-    };
-    res = get_i2c_pins(I2C_NUM_0, &es_i2c_cfg);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "getting i2c pins error: %d", res);
-        return res;  // Failed to get I2C pins
-    }
-    dev->i2c_handle = i2c_bus_create(I2C_NUM_0, &es_i2c_cfg);
-
     esp_err_t err;
     uint8_t dummy;
 

@@ -3,6 +3,8 @@ set (SOURCES
     "cr95hf.c"
     "digital.c"
     "ht16d35a.c"
+    "lis2dh12_reg.c"
+    "lodepng.c"
     "main.c"
     "pi4ioe5v6416.c"
     "sound_stream.c"

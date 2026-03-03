@@ -7,9 +7,10 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
 
-#include "pi4ioe5v6416.h"
 #include "cr95hf.h"
 #include "ht16d35a.h"
+#include "lis2dh12_reg.h"
+#include "pi4ioe5v6416.h"
 
 typedef struct {
     struct {

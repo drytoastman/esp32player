@@ -48,8 +48,14 @@ pi4ioe5v6416_t iox = {
     .address = PI4IOE_ADDR,
 };
 
+stmdev_ctx_t accel = {
+    .address = LIS2DH12_ADDR,
+};
+
+
 spi_device_handle_t cr95hf, ht16d35a;
 SemaphoreHandle_t spi_bus_mutex;
+i2c_bus_handle_t i2c_bus;
 
 void app_main(void)
 {
@@ -63,9 +69,7 @@ void app_main(void)
     esp_log_level_set("spi", ESP_LOG_DEBUG);
     esp_log_level_set("spi_flash", ESP_LOG_DEBUG);
 
-    digital_init();
-    analog_init();
-
+    // Start our other SPI bus
     // SDCARD uses HSPI, something else is using SPI so we use VSPI
     spi_bus_config_t buscfg = {
         .mosi_io_num = GPIO_NUM_18,
@@ -81,17 +85,40 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to create SPI bus mutex");
     }
 
-    /*
+    // Make sure we have started the I2C bus, must be EXACTLY the same as the ADF version
+    // For some reason, they keep their initialized handle in static file global and not
+    // somewhere shared.
+    esp_err_t res;
+    i2c_config_t es_i2c_cfg = {
+        .mode = I2C_MODE_MASTER,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 100000
+    };
+    res = get_i2c_pins(I2C_NUM_0, &es_i2c_cfg);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "getting i2c pins error: %d", res);
+        return;  // Failed to get I2C pins
+    }
+    i2c_bus = i2c_bus_create(I2C_NUM_0, &es_i2c_cfg);
+
+    accel.i2c_handle = i2c_bus;
+    iox.i2c_handle = i2c_bus;
+
+    digital_init();
+    analog_init();
+
+    lis2dh12_init(&accel);
+
     cr95hf_init(&cr95hf);
     vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
     cr95hf_info(cr95hf);
-    */
 
     ht16d35a_init(&ht16d35a);
 
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 1024, NULL, 5, NULL, 1);
-    //xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
+    xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
     start_wifi();
     start_webserver();

@@ -7,7 +7,7 @@
 #define WIDTH 16
 #define HEIGHT 16
 
-const char *TAG = "web";
+static const char *TAG = "web";
 EXT_RAM_BSS_ATTR uint8_t framebuffer[WIDTH * HEIGHT * 3]; // RGB888 framebuffer
 extern const char html_page[];
 

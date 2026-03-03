@@ -137,6 +137,28 @@ void sound_main(void *inputParameters)
     ESP_LOGI(TAG, "[ 7 ] Stop audio_pipeline");
     audio_pipeline_stop(pipeline);
     audio_pipeline_wait_for_stop(pipeline);
+    audio_pipeline_reset_ringbuffer(pipeline);
+    audio_pipeline_reset_elements(pipeline);
+
+#if startanotherfile
+    audio_pipeline_unregister(pipeline, http_stream_reader);
+
+    audio_pipeline_register(pipeline, fatfs_stream_reader, "file");
+    audio_pipeline_link(pipeline, (const char *[]) {"file", "decoder", "i2s"}, 3);
+
+    audio_element_set_uri(fatfs_stream_reader, "/sdcard/song.mp3");
+#endif
+
+#if startanhttpstream
+    audio_pipeline_unregister(pipeline, fatfs_stream_reader);
+
+    audio_pipeline_register(pipeline, http_stream_reader, "http");
+    audio_pipeline_link(pipeline, (const char *[]) {"http", "decoder", "i2s"}, 3);
+
+    audio_element_set_uri(http_stream_reader, "http://example.com/song.mp3");
+#endif
+
+#if noshutdown
     audio_pipeline_terminate(pipeline);
 
     audio_pipeline_unregister(pipeline, fatfs_stream_reader);
@@ -156,9 +178,11 @@ void sound_main(void *inputParameters)
     /* Release all resources */
     audio_pipeline_deinit(pipeline);
     audio_element_deinit(fatfs_stream_reader);
+
     audio_element_deinit(i2s_stream_writer);
     audio_element_deinit(music_decoder);
-    esp_periph_set_destroy(set);
+    esp_periph_set_destroy(set);  // <<< Problem child
+#endif
 
     vTaskDelete(NULL);
 }

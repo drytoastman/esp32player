@@ -226,7 +226,7 @@ void digital_processor(void *ignored)
             ESP_LOGI(TAG, "IOX Tilt pin changed to: %d", current.iox.tilt);
         }
         if (current.iox.power != previous.iox.power) {
-            // ESP_LOGI(TAG, "IOX Power pin changed to: %d", current.iox.power);
+            ESP_LOGI(TAG, "IOX Power pin changed to: %d", current.iox.power);
             // Noisy when warm?
         }
         if (current.iox.plug_stat != previous.iox.plug_stat) {

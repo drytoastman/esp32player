@@ -100,30 +100,15 @@ typedef struct
 #define PROPERTY_DISABLE                (0U)
 #define PROPERTY_ENABLE                 (1U)
 
-/** @addtogroup  Interfaces_Functions
-  * @brief       This section provide a set of functions used to read and
-  *              write a generic register of the device.
-  *              MANDATORY: return 0 -> no Error.
-  * @{
-  *
-  */
-typedef int32_t (*stmdev_write_ptr)(void *, uint8_t, const uint8_t *, uint16_t);
-typedef int32_t (*stmdev_read_ptr)(void *, uint8_t, uint8_t *, uint16_t);
-typedef void (*stmdev_mdelay_ptr)(uint32_t millisec);
-
+#include "i2c_bus.h"
+#define LIS2DH12_ADDR  0x30
 typedef struct
 {
-  /** Component mandatory fields **/
-  stmdev_write_ptr  write_reg;
-  stmdev_read_ptr   read_reg;
-  /** Component optional fields **/
-  stmdev_mdelay_ptr   mdelay;
-  /** Customizable optional pointer **/
-  void *handle;
-
-  /** private data **/
-  void *priv_data;
+    uint8_t address;
+    i2c_bus_handle_t i2c_handle;
 } stmdev_ctx_t;
+void lis2dh12_init(stmdev_ctx_t *ctx);
+
 
 /**
   * @}

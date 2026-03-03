@@ -17,6 +17,9 @@
   */
 
 #include "lis2dh12_reg.h"
+#include "i2c_bus.h"
+#include "esp_log.h"
+static const char *TAG = "LIS2DH12";
 
 /**
   * @defgroup  LIS2DH12
@@ -49,16 +52,8 @@ int32_t __weak lis2dh12_read_reg(const stmdev_ctx_t *ctx, uint8_t reg,
                                  uint8_t *data,
                                  uint16_t len)
 {
-  int32_t ret;
-
-  if (ctx == NULL)
-  {
-    return -1;
-  }
-
-  ret = ctx->read_reg(ctx->handle, reg, data, len);
-
-  return ret;
+  ESP_LOGI(TAG, "lis2dh12_read_reg 0x%X/0x%x 0x%X", ctx->i2c_handle, ctx->address, reg);
+  return i2c_bus_read_bytes(ctx->i2c_handle, ctx->address, &reg, sizeof(reg), data, len);
 }
 
 /**
@@ -75,16 +70,64 @@ int32_t __weak lis2dh12_write_reg(const stmdev_ctx_t *ctx, uint8_t reg,
                                   uint8_t *data,
                                   uint16_t len)
 {
-  int32_t ret;
+  return i2c_bus_write_bytes(ctx->i2c_handle, ctx->address, &reg, sizeof(reg), data, len);
+}
 
-  if (ctx == NULL)
-  {
-    return -1;
+void lis2dh12_init(stmdev_ctx_t *ctx) {
+  uint8_t buff = 0xFF;
+  lis2dh12_device_id_get(ctx, &buff);
+  ESP_LOGI(TAG, "whoami on address 0x%x returned 0x%x", ctx->address, buff);
+
+  lis2dh12_data_rate_set(ctx, LIS2DH12_POWER_DOWN);
+
+  // disable int
+  lis2dh12_int1_cfg_t int1cfg = {0};
+  lis2dh12_int1_gen_conf_set(ctx, &int1cfg);
+
+  // set polarity
+  lis2dh12_ctrl_reg6_t reg6;
+  lis2dh12_pin_int2_config_get(ctx, &reg6);
+  reg6.int_polarity = 1; //Set INT_POLARITY bit for active low
+  lis2dh12_pin_int2_config_set(ctx, &reg6);
+
+  // set INT1 interrupt
+  lis2dh12_ctrl_reg3_t reg3;
+  lis2dh12_pin_int1_config_get(ctx, &reg3);
+  reg3.i1_ia1 = 1; //Enable IA1 on INT1
+  lis2dh12_pin_int1_config_set(ctx, &reg3);
+
+    //Set INT1 threshold
+  //INT1_THS = 500mg / 16mb = 31
+  //accel.setInt1Threshold(62); //90 degree tilt before interrupt
+  lis2dh12_int1_gen_threshold_set(ctx, 31);
+
+  //Set INT1 Duration
+  //INT1_DURATION = 500
+  //accel.setInt1Duration(30);
+  lis2dh12_int1_gen_duration_set(ctx, 9);
+
+  //Latch interrupt 1, CTRL_REG5, LIR_INT1
+  //accel.setInt1Latch(true);
+  //accel.setInt1Latch(false);
+  lis2dh12_ctrl_reg5_t reg5;
+  if (lis2dh12_read_reg(ctx, LIS2DH12_CTRL_REG5, (uint8_t*)&reg5, 1) == 0) {
+    reg5.lir_int1 = 0;
+    lis2dh12_write_reg(ctx, LIS2DH12_CTRL_REG5, (uint8_t*)&reg5, 1);
   }
 
-  ret = ctx->write_reg(ctx->handle, reg, data, len);
+  //Clear the interrupt
+  lis2dh12_int1_src_t int1;
+  lis2dh12_int1_gen_source_get(ctx, &int1);
 
-  return ret;
+  //accel.setDataRate(LIS2DH12_ODR_1Hz); //Very low power
+  //accel.setDataRate(LIS2DH12_ODR_100Hz);
+  lis2dh12_data_rate_set(ctx, LIS2DH12_ODR_25Hz);
+
+  // enable int
+  memset(&int1cfg, 0, sizeof(int1cfg));
+  int1cfg.xhie = 1;
+  int1cfg.yhie = 1;
+  lis2dh12_int1_gen_conf_set(ctx, &int1cfg);
 }
 
 /**
