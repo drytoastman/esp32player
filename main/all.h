@@ -57,7 +57,7 @@ extern output_cfg output_params;
 extern audio_board_handle_t board_handle;
 extern pi4ioe5v6416_t iox;
 extern SemaphoreHandle_t spi_bus_mutex;
-extern spi_device_handle_t cr95hf, ht16d35a;
+extern spi_device_handle_t ht16d35a;
 
 #define MAX_SPI_WAIT_MS 100
 
@@ -65,6 +65,9 @@ void digital_init();
 void digital_processor(void *ignored);
 void analog_init();
 void analog_processor(void *ignored);
+
+void nfc_processor(void *ignored);
+
 
 void pcactl(bool level);
 void nfc_cs(bool level);

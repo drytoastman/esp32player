@@ -213,12 +213,12 @@ void digital_processor(void *ignored)
         if (current.iox.right != previous.iox.right) {
             ESP_LOGI(TAG, "IOX Right pin changed to: %d", current.iox.right);
             if (current.iox.right) {
-                ht16d35a_poke(ht16d35a);
+                static int toggle = 0;
             }
         }
-        if (current.iox.nfc_irq != previous.iox.nfc_irq) {
-            ESP_LOGI(TAG, "IOX NFC IRQ pin changed to: %d", current.iox.nfc_irq);
-        }
+        // if (current.iox.nfc_irq != previous.iox.nfc_irq) {
+        //     ESP_LOGI(TAG, "IOX NFC IRQ pin changed to: %d", current.iox.nfc_irq);
+        // }
         if (current.iox.hp_detect != previous.iox.hp_detect) {
             ESP_LOGI(TAG, "IOX HP Detect pin changed to: %d", current.iox.hp_detect);
         }

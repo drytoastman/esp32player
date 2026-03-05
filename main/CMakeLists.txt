@@ -6,6 +6,7 @@ set (SOURCES
     "lis2dh12_reg.c"
     "lodepng.c"
     "main.c"
+    "nfc_process.c"
     "pi4ioe5v6416.c"
     "sound_stream.c"
     "webserver.c"

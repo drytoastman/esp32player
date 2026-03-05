@@ -53,7 +53,7 @@ stmdev_ctx_t accel = {
 };
 
 
-spi_device_handle_t cr95hf, ht16d35a;
+spi_device_handle_t ht16d35a;
 SemaphoreHandle_t spi_bus_mutex;
 i2c_bus_handle_t i2c_bus;
 
@@ -63,11 +63,6 @@ void app_main(void)
     ESP_LOGI(TAG, "Free spiram memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
 
     esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("spi_hal", ESP_LOG_DEBUG);
-    esp_log_level_set("spi_master", ESP_LOG_DEBUG);
-    esp_log_level_set("spi_slave", ESP_LOG_DEBUG);
-    esp_log_level_set("spi", ESP_LOG_DEBUG);
-    esp_log_level_set("spi_flash", ESP_LOG_DEBUG);
 
     // Start our other SPI bus
     // SDCARD uses HSPI, something else is using SPI so we use VSPI
@@ -110,23 +105,21 @@ void app_main(void)
 
     lis2dh12_init(&accel);
 
-    cr95hf_init(&cr95hf);
-    vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to ensure CR95HF is ready before proceeding
-    cr95hf_info(cr95hf);
 
     ht16d35a_init(&ht16d35a);
 
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(analog_processor, "analog_processor", 1024, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
+    xTaskCreatePinnedToCore(analog_processor, "analog_processor", 2048, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(nfc_processor, "nfc_processor", 3072, NULL, 5, NULL, 1);
+    //xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
-    start_wifi();
-    start_webserver();
+    //start_wifi();
+    //start_webserver();
 
     vTaskDelay(pdMS_TO_TICKS(1000));
-    ESP_LOGI(TAG, "Free internal memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
-    ESP_LOGI(TAG, "Free spiram memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
-
+    ESP_LOGI(TAG, "Free internal memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
+    ESP_LOGI(TAG, "Free spiram memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
+    ESP_LOGI(TAG, "DMA free: %d kB", heap_caps_get_free_size(MALLOC_CAP_DMA)/1024);
     /**
     while (1) {
         char buffer[1024];

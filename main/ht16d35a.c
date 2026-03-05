@@ -43,6 +43,7 @@ void ht16d35a_init(spi_device_handle_t *dev) {
     char clear[226] = {0};
     clear[0] = 0x80;
     clear[1] = 0x00;
+    memset(&clear[2], 0x20, 224);
 
     for (int ii = 0; ii < 4; ii++) {
         ht16d35a_tx(*dev, gray, sizeof(gray), ii);
@@ -51,13 +52,23 @@ void ht16d35a_init(spi_device_handle_t *dev) {
         ht16d35a_tx(*dev, cout, sizeof(cout), ii);
         ht16d35a_tx(*dev, bright, sizeof(bright), ii);
         ht16d35a_tx(*dev, on, sizeof(on), ii);
-        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
     ht16d35a_tx(*dev, clear, sizeof(clear), 0);
     ht16d35a_tx(*dev, clear, sizeof(clear), 1);
     ht16d35a_tx(*dev, clear, sizeof(clear), 2);
     ht16d35a_tx(*dev, clear, sizeof(clear), 3);
+}
+
+
+/**
+ * Set a brightness level from 0x00 to 0x40
+ */
+void ht16d35a_brightness(spi_device_handle_t *dev, uint8_t level) {
+    char bright[] = { 0x37, level };  // brightness
+    for (int ii = 0; ii < 4; ii++) {
+        ht16d35a_tx(*dev, bright, sizeof(bright), ii);
+    }
 }
 
 
@@ -90,7 +101,6 @@ void ht16d35a_load_icon(spi_device_handle_t dev, uint8_t *fb, int fblen) {
             memcpy(&panel[2+168], &fb[fbidx], 24); fbidx += 24;
             memcpy(&panel[2+196], &fb[fbidx], 24); fbidx += 24;
 
-            spi_device_acquire_bus(dev, portMAX_DELAY);
             display_cs(display, 0);
             esp_rom_delay_us(5);
 
@@ -103,7 +113,6 @@ void ht16d35a_load_icon(spi_device_handle_t dev, uint8_t *fb, int fblen) {
 
             esp_rom_delay_us(5);
             display_cs(display, 1);
-            spi_device_release_bus(dev);
         }
 
         xSemaphoreGive(spi_bus_mutex);
@@ -196,36 +205,4 @@ void ht16d35a_rx(spi_device_handle_t dev, char *rx, int *rx_len, int display) {
     } else {
         ESP_LOGE(TAG, "Failed to acquire SPI bus mutex");
     }
-}
-
-int whack = 2;
-void ht16d35a_try(spi_device_handle_t dev, int val) {
-
-    char everything[226] = {0};
-    everything[0] = 0x80;
-    everything[1] = 0x00; // start of data
-
-    ht16d35a_tx(dev, everything, sizeof(everything), 0);
-    ht16d35a_tx(dev, everything, sizeof(everything), 1);
-    ht16d35a_tx(dev, everything, sizeof(everything), 2);
-    ht16d35a_tx(dev, everything, sizeof(everything), 3);
-
-    for (int ii = 2; ii < 226; ii++) {
-        everything[ii] = 0x00;
-    }
-    everything[whack] = 0x10;
-    whack++;
-
-    ht16d35a_tx(dev, everything, sizeof(everything), 0);
-}
-
-void ht16d35a_info(spi_device_handle_t dev) {
-    char out[3] = { 0, 0, 0 };
-    ht16d35a_tx(dev, out, sizeof(out), 0);
-    //ht16d35a_wait();
-
-    int datalen;
-    //ht16d35a_rx(dev, buf, &datalen);
-
-   // ESP_LOGI(TAG, "IDN (%d) '%s'", datalen, buf);
 }
