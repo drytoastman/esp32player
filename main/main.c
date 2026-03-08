@@ -64,6 +64,8 @@ void app_main(void)
 
     esp_log_level_set("*", ESP_LOG_INFO);
 
+    // Mount the SD card and grab the first SPI bus
+
     // Start our other SPI bus
     // SDCARD uses HSPI, something else is using SPI so we use VSPI
     spi_bus_config_t buscfg = {
@@ -96,9 +98,9 @@ void app_main(void)
         return;  // Failed to get I2C pins
     }
     i2c_bus = i2c_bus_create(I2C_NUM_0, &es_i2c_cfg);
-
     accel.i2c_handle = i2c_bus;
     iox.i2c_handle = i2c_bus;
+
 
     digital_init();
     analog_init();
@@ -108,25 +110,34 @@ void app_main(void)
 
     ht16d35a_init(&ht16d35a);
 
+    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
+
+
+    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
+
+
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 2048, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(nfc_processor, "nfc_processor", 3072, NULL, 5, NULL, 1);
-    //xTaskCreatePinnedToCore(sound_main, "sound_main", 4096, NULL, 5, NULL, 1); // streams will go on 0?
+
+    mount_sdcard();
+    load_icon("/sdcard/afDCk/CfeVWoQtDUMnxmlOJ8_0TfqlkFsjDtGZZrsVb5A08RI");
+    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
+
+    xTaskCreatePinnedToCore(playback_task, "playback_task", 4096, NULL, 5, NULL, 1); // streams will go on 0?
 
     //start_wifi();
     //start_webserver();
 
     vTaskDelay(pdMS_TO_TICKS(1000));
-    ESP_LOGI(TAG, "Free internal memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
-    ESP_LOGI(TAG, "Free spiram memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
-    ESP_LOGI(TAG, "DMA free: %d kB", heap_caps_get_free_size(MALLOC_CAP_DMA)/1024);
-    /**
     while (1) {
         char buffer[1024];
         vTaskGetRunTimeStats(buffer);
-        printf("%s\n", buffer);
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        ESP_LOGI(TAG, "%s", buffer);
+        ESP_LOGI(TAG, "Free internal memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
+        ESP_LOGI(TAG, "Free spiram memory: %d kB", heap_caps_get_free_size(MALLOC_CAP_SPIRAM)/1024);
+        ESP_LOGI(TAG, "DMA free: %d kB", heap_caps_get_free_size(MALLOC_CAP_DMA)/1024);
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
-        */
 }
 

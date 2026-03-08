@@ -3,8 +3,6 @@
 
 static const char *TAG = "pi4ioe5v6416";
 
-esp_err_t get_i2c_pins(i2c_port_t port, i2c_config_t *i2c_config);
-
 int pi4ioe5v6416_init(pi4ioe5v6416_t *dev)
 {
     esp_err_t err;

@@ -33,7 +33,11 @@
 #define ISO14443A_NVB_ANTICOLL 0x20
 #define ISO14443A_NVB_SELECT 0x70
 #define ISO14443A_READ 0x30
+#define ISO14443A_WRITE 0xA0
 #define ISO14443A_HALT 0x50
+
+#define ISO14443A_KEYA 0x60
+#define ISO14443A_KEYA 0x61
 
 // Transmit Flags
 #define FLAG_SHORTFRAME 0x07
@@ -203,7 +207,7 @@ esp_err_t cr95hf_poll(spi_device_handle_t dev, bool wake_up, uint8_t *atqa, int 
 /**
  * Blindly assume CL2 tag UID just cause
  */
-esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *uid, int *uidlen) {
+esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, int *uidlen) {
     uint8_t inbuf[32];
     int buflen = sizeof(inbuf);
     esp_err_t err;
@@ -230,8 +234,8 @@ esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *uid, int *uidlen) {
 
     buflen = sizeof(inbuf);
     err = cr95hf_rx(dev, inbuf, &buflen); // expect SAK(04) CRC_A (DA 17) OK 00 00
-    if (err) return err;
-
+    ESP_LOGI(TAG, "SAK = 0x%X", inbuf[0]);
+    if (err)  return err;
 
     // AntiCol 2
     ESP_LOGI(TAG, "ANTICOL2");

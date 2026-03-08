@@ -22,6 +22,7 @@ audio_board_handle_t audio_board_init(void)
     return board_handle;
 }
 
+#if 0
 esp_err_t audio_board_sdcard_init(esp_periph_set_handle_t set, periph_sdcard_mode_t mode)
 {
     periph_sdcard_cfg_t sdcard_cfg = {
@@ -47,7 +48,7 @@ esp_err_t audio_board_sdcard_init(esp_periph_set_handle_t set, periph_sdcard_mod
     }
     return ret;
 }
-
+#endif
 
 audio_board_handle_t audio_board_get_handle(void)
 {

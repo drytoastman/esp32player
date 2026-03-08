@@ -167,8 +167,9 @@ void digital_processor(void *ignored)
             ESP_LOGI(TAG, "Volume: %d", volume);
 
             // Apply to codec here
-            if (board_handle && board_handle->audio_hal) {
-                audio_hal_set_volume(board_handle->audio_hal, volume);
+            audio_board_handle_t handle = audio_board_get_handle();
+            if (handle && handle->audio_hal) {
+                audio_hal_set_volume(handle->audio_hal, volume);
             } else {
                 ESP_LOGW(TAG, "Audio board not initialized yet, cannot set volume");
             }

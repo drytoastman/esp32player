@@ -41,49 +41,24 @@ esp_err_t get_i2s_pins(int port, board_i2s_pin_t *i2s_config)
     return ESP_OK;
 }
 
-/*
-"type":"spi",
-"mosi":"GPIO.22",
-"miso":"GPIO.34",
-"sclk":"GPIO.14",
-"cs":"GPIO.15"
-*
-
-esp_err_t get_spi_pins(spi_bus_config_t *spi_config, spi_device_interface_config_t *spi_device_interface_config)
-{
-    AUDIO_NULL_CHECK(TAG, spi_config, return ESP_FAIL);
-    AUDIO_NULL_CHECK(TAG, spi_device_interface_config, return ESP_FAIL);
-
-    spi_config->mosi_io_num = GPIO_NUM_22;
-    spi_config->miso_io_num = GPIO_NUM_34;
-    spi_config->sclk_io_num = GPIO_NUM_14;
-    spi_config->quadwp_io_num = -1;
-    spi_config->quadhd_io_num = -1;
-
-    spi_device_interface_config->spics_io_num = GPIO_NUM_15;
-
-    ESP_LOGW(TAG, "SPI interface is not is not supported");
-    return ESP_OK;
-}
-*/
 // sdcard
 
-int8_t get_sdcard_intr_gpio(void)
-{
-    return SDCARD_INTR_GPIO;
-}
+// int8_t get_sdcard_intr_gpio(void)
+// {
+//     return SDCARD_INTR_GPIO;
+// }
 
-int8_t get_sdcard_open_file_num_max(void)
-{
-    return SDCARD_OPEN_FILE_NUM_MAX;
-}
+// int8_t get_sdcard_open_file_num_max(void)
+// {
+//     return SDCARD_OPEN_FILE_NUM_MAX;
+// }
 
-// input-output pins
+// // input-output pins
 
-int8_t get_auxin_detect_gpio(void)
-{
-    return AUXIN_DETECT_GPIO;
-}
+// int8_t get_auxin_detect_gpio(void)
+// {
+//     return AUXIN_DETECT_GPIO;
+// }
 
 int8_t get_pa_enable_gpio(void)
 {
@@ -127,12 +102,12 @@ int8_t get_input_voldown_id(void)
 
 // led pins
 
-int8_t get_red_led_gpio(void)
-{
-    return RED_LED_GPIO;
-}
+// int8_t get_red_led_gpio(void)
+// {
+//     return RED_LED_GPIO;
+// }
 
-int8_t get_green_led_gpio(void)
-{
-    return GREEN_LED_GPIO;
-}
+// int8_t get_green_led_gpio(void)
+// {
+//     return GREEN_LED_GPIO;
+// }

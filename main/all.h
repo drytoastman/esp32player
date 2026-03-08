@@ -54,12 +54,15 @@ typedef struct {
 extern input_config input_params;
 extern analog_config analog_params;
 extern output_cfg output_params;
-extern audio_board_handle_t board_handle;
+//extern audio_board_handle_t board_handle;
 extern pi4ioe5v6416_t iox;
 extern SemaphoreHandle_t spi_bus_mutex;
 extern spi_device_handle_t ht16d35a;
 
 #define MAX_SPI_WAIT_MS 100
+#define MOUNT_POINT "/sdcard"
+
+void mount_sdcard();
 
 void digital_init();
 void digital_processor(void *ignored);
@@ -68,6 +71,7 @@ void analog_processor(void *ignored);
 
 void nfc_processor(void *ignored);
 
+esp_err_t load_icon(char *path);
 
 void pcactl(bool level);
 void nfc_cs(bool level);
@@ -77,6 +81,7 @@ void display_cs(int display, bool level);
 
 void start_wifi(void);
 void start_webserver();
-void sound_main(void *ignored);
+//void sound_main(void *ignored);
+void playback_task(void *ignored);
 
 #endif

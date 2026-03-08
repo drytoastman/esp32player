@@ -29,7 +29,7 @@ void nfc_processor(void *ignored) {
                 ESP_LOGI(TAG, "Card detected, ATQA=%02X%02X", data[0], data[1]);
 
                 uidlen = sizeof(uid);
-                if (cr95hf_select(cr95hf, uid, &uidlen) == ESP_OK) {
+                if (cr95hf_select(cr95hf, data, uid, &uidlen) == ESP_OK) {
                     active = true;
                     ESP_LOGI(TAG, "Read %d from: ");
                     ESP_LOG_BUFFER_HEX(TAG, uid, uidlen);
@@ -38,7 +38,6 @@ void nfc_processor(void *ignored) {
                         datalen = sizeof(data);
                         memset(data, 0, datalen);
                         if (cr95hf_read(cr95hf, ii, data, &datalen) == ESP_OK) {
-                            ESP_LOGI(TAG, "Page %d: ", ii);
                             ESP_LOG_BUFFER_HEXDUMP(TAG, data, 16, ESP_LOG_INFO);
                         } else {
                             cr95hf_halt(cr95hf);

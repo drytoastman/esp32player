@@ -43,7 +43,6 @@ void ht16d35a_init(spi_device_handle_t *dev) {
     char clear[226] = {0};
     clear[0] = 0x80;
     clear[1] = 0x00;
-    memset(&clear[2], 0x20, 224);
 
     for (int ii = 0; ii < 4; ii++) {
         ht16d35a_tx(*dev, gray, sizeof(gray), ii);
@@ -138,7 +137,6 @@ void ht16d35a_poke(spi_device_handle_t dev) {
             t.tx_buffer = off;
             ESP_ERROR_CHECK(spi_device_transmit(dev, &t));
             display_cs(ii, 1);
-            xSemaphoreGive(spi_bus_mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(1));
         for (int ii = 0; ii < 4; ii++) {
@@ -146,8 +144,8 @@ void ht16d35a_poke(spi_device_handle_t dev) {
             t.tx_buffer = on;
             ESP_ERROR_CHECK(spi_device_transmit(dev, &t));
             display_cs(ii, 1);
-            xSemaphoreGive(spi_bus_mutex);
         }
+        xSemaphoreGive(spi_bus_mutex);
     } else {
         ESP_LOGE(TAG, "Failed to acquire SPI bus mutex");
     }
