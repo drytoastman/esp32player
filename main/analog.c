@@ -76,8 +76,8 @@ void analog_processor(void *ignored)
 
         // --- Logging every 64 cycles (~1.28s if delay=20ms) ---
         if ((cycle % 64) == 0) {
-            ESP_LOGI(TAG, "Light: %u", light_filtered); // 0 - 4095
-            ESP_LOGI(TAG, "Voltage: %u", voltage_filtered);
+            ESP_LOGD(TAG, "Light: %u", light_filtered); // 0 - 4095
+            ESP_LOGD(TAG, "Voltage: %u", voltage_filtered);
 
             int scaled = light_filtered >> 6;
             ht16d35a_brightness(&ht16d35a, scaled ? scaled : 1); // reduce to 1-63 range

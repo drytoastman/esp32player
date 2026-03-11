@@ -91,14 +91,10 @@ void ht16d35a_load_icon(spi_device_handle_t dev, uint8_t *fb, int fblen) {
     if (xSemaphoreTake(spi_bus_mutex, pdMS_TO_TICKS(MAX_SPI_WAIT_MS)) == pdTRUE) {
 
         for (int display = 0; display < 4; display++) {
-            memcpy(&panel[2+0],   &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+28],  &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+56],  &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+84],  &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+112], &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+140], &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+168], &fb[fbidx], 24); fbidx += 24;
-            memcpy(&panel[2+196], &fb[fbidx], 24); fbidx += 24;
+            // 2 offset is for the command bytes and length for the SPI transaction
+            for (int jj = 2; jj < 226; jj += 28) {
+                memcpy(&panel[jj], &fb[fbidx], 24); fbidx += 24;
+            }
 
             display_cs(display, 0);
             esp_rom_delay_us(5);

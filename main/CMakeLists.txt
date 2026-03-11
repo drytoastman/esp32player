@@ -1,6 +1,7 @@
 set (SOURCES
     "analog.c"
     "cr95hf.c"
+    "debugio.c"
     "digital.c"
     "ht16d35a.c"
     "images.c"

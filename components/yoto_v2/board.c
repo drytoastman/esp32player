@@ -22,39 +22,6 @@ audio_board_handle_t audio_board_init(void)
     return board_handle;
 }
 
-#if 0
-esp_err_t audio_board_sdcard_init(esp_periph_set_handle_t set, periph_sdcard_mode_t mode)
-{
-    periph_sdcard_cfg_t sdcard_cfg = {
-        .root = "/sdcard",
-        .card_detect_pin = get_sdcard_intr_gpio(), // GPIO_NUM_34
-        .mode = SD_MODE_SPI
-    };
-    esp_periph_handle_t sdcard_handle = periph_sdcard_init(&sdcard_cfg);
-    esp_err_t ret = esp_periph_start(set, sdcard_handle);
-    int retry_time = 5;
-    bool mount_flag = false;
-    while (retry_time --) {
-        if (periph_sdcard_is_mounted(sdcard_handle)) {
-            mount_flag = true;
-            break;
-        } else {
-            vTaskDelay(500 / portTICK_PERIOD_MS);
-        }
-    }
-    if (mount_flag == false) {
-        ESP_LOGE(TAG, "Sdcard mount failed");
-        return ESP_FAIL;
-    }
-    return ret;
-}
-#endif
-
-audio_board_handle_t audio_board_get_handle(void)
-{
-    return board_handle;
-}
-
 esp_err_t audio_board_deinit(audio_board_handle_t audio_board)
 {
     esp_err_t ret = ESP_OK;

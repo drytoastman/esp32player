@@ -81,7 +81,16 @@ void display_cs(int display, bool level);
 
 void start_wifi(void);
 void start_webserver();
-//void sound_main(void *ignored);
+
+#define AUDIO_EVENT_PLAYPAUSE 201
+#define AUDIO_EVENT_NEXT 202
+#define AUDIO_EVENT_PREV 203
+#define AUDIO_EVENT_SET_TRACK 204
+#define AUDIO_EVENT_VOLUME 205
+
 void playback_task(void *ignored);
+void playback_inject_event(int keypress_cmd, int data);
+
+void debugio_task(void* arg);
 
 #endif

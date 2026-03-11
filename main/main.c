@@ -57,6 +57,10 @@ spi_device_handle_t ht16d35a;
 SemaphoreHandle_t spi_bus_mutex;
 i2c_bus_handle_t i2c_bus;
 
+void shutdown_handler() {
+    ESP_LOGI(TAG, "System is shutting down");
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "Free internal memory: 0x%X bytes", heap_caps_get_free_size(MALLOC_CAP_INTERNAL)/1024);
@@ -65,6 +69,9 @@ void app_main(void)
     esp_log_level_set("*", ESP_LOG_INFO);
 
     // Mount the SD card and grab the first SPI bus
+    mount_sdcard();
+
+    esp_register_shutdown_handler(shutdown_handler);
 
     // Start our other SPI bus
     // SDCARD uses HSPI, something else is using SPI so we use VSPI
@@ -101,36 +108,26 @@ void app_main(void)
     accel.i2c_handle = i2c_bus;
     iox.i2c_handle = i2c_bus;
 
-
     digital_init();
     analog_init();
 
     lis2dh12_init(&accel);
-
-
     ht16d35a_init(&ht16d35a);
-
-    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
-
-
-    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
-
 
     xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(analog_processor, "analog_processor", 2048, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(nfc_processor, "nfc_processor", 3072, NULL, 5, NULL, 1);
 
-    mount_sdcard();
     load_icon("/sdcard/afDCk/CfeVWoQtDUMnxmlOJ8_0TfqlkFsjDtGZZrsVb5A08RI");
-    vTaskDelay(pdMS_TO_TICKS(2000)); // wait for display to initialize before loading icons
-
     xTaskCreatePinnedToCore(playback_task, "playback_task", 4096, NULL, 5, NULL, 1); // streams will go on 0?
+
+    xTaskCreatePinnedToCore(debugio_task, "debugio_task", 4096, NULL, 4, NULL, 1);
 
     //start_wifi();
     //start_webserver();
 
     vTaskDelay(pdMS_TO_TICKS(1000));
-    while (1) {
+    while (0) {
         char buffer[1024];
         vTaskGetRunTimeStats(buffer);
         ESP_LOGI(TAG, "%s", buffer);
