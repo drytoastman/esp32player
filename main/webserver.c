@@ -115,9 +115,9 @@ esp_err_t upload_post_handler(httpd_req_t *req)
     //   scaling
     //   LED gamma (gammaOut)
     // before sending to HT16D35A.
-    process_image_6bit(framebuffer, received, true);
+    //process_image_6bit(framebuffer, received, true);
 
-    ht16d35a_load_icon(ht16d35a, framebuffer, received);
+    //display_load_fb(ht16d35a, framebuffer, received);
 
     httpd_resp_sendstr(req, "OK");
     return ESP_OK;

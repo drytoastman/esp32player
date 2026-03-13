@@ -1,9 +1,8 @@
 
-#include "ht16d35a.h"
 #include "all.h"
-#include "esp_rom_sys.h"
 
-static char *TAG = "ht16d35a";
+static char *TAG = "display";
+
 /*
 Set COM output Control
 Set ROW output Control
@@ -18,7 +17,7 @@ void ht16d35a_tx(spi_device_handle_t dev, char *tx, int tx_len, int display);
 void ht16d35a_rx(spi_device_handle_t dev, char *rx, int *rx_len, int display);
 
 
-void ht16d35a_init(spi_device_handle_t *dev) {
+void display_init(spi_device_handle_t *dev) {
     ESP_LOGI(TAG, "Add device");
 
     ESP_ERROR_CHECK(spi_bus_add_device(VSPI_HOST, &(spi_device_interface_config_t) {
@@ -32,13 +31,12 @@ void ht16d35a_init(spi_device_handle_t *dev) {
     }, dev));
 
 
-    char com[] = {0x41, 0xFF}; // COM pin
-    char row[] = {0x42, 0xFF, 0xFF, 0xFF, 0xFF}; // Row pins
-    char gray[] = {0x31, 0x00};  // gray mode
-    char cout[] = {0x32, 0x07};  // COM outputs scan
-    char bright[] = {0x37, 0x40};  // brightness
-    //0x36, 0x06,  // current
-    char on[] = { 0x35, 0x03 };  // system on
+    char com[]    = { 0x41, 0xFF }; // COM pin
+    char row[]    = { 0x42, 0xFF, 0xFF, 0xFF, 0xFF }; // Row pins
+    char gray[]   = { 0x31, 0x00 };  // gray mode
+    char cout[]   = { 0x32, 0x07 };  // COM outputs scan
+    char bright[] = { 0x37, 0x40 };  // brightness
+    char on[]     = { 0x35, 0x03 };  // system on
 
     char clear[226] = {0};
     clear[0] = 0x80;
@@ -50,20 +48,16 @@ void ht16d35a_init(spi_device_handle_t *dev) {
         ht16d35a_tx(*dev, row, sizeof(row), ii);
         ht16d35a_tx(*dev, cout, sizeof(cout), ii);
         ht16d35a_tx(*dev, bright, sizeof(bright), ii);
+        ht16d35a_tx(*dev, clear, sizeof(clear), ii);
         ht16d35a_tx(*dev, on, sizeof(on), ii);
     }
-
-    ht16d35a_tx(*dev, clear, sizeof(clear), 0);
-    ht16d35a_tx(*dev, clear, sizeof(clear), 1);
-    ht16d35a_tx(*dev, clear, sizeof(clear), 2);
-    ht16d35a_tx(*dev, clear, sizeof(clear), 3);
 }
 
 
 /**
  * Set a brightness level from 0x00 to 0x40
  */
-void ht16d35a_brightness(spi_device_handle_t *dev, uint8_t level) {
+void display_brightness(spi_device_handle_t *dev, uint8_t level) {
     char bright[] = { 0x37, level };  // brightness
     for (int ii = 0; ii < 4; ii++) {
         ht16d35a_tx(*dev, bright, sizeof(bright), ii);
@@ -71,23 +65,15 @@ void ht16d35a_brightness(spi_device_handle_t *dev, uint8_t level) {
 }
 
 
-void ht16d35a_load_icon(spi_device_handle_t dev, uint8_t *fb, int fblen) {
+void display_load_fb(spi_device_handle_t dev, uint8_t *fb, int fblen) {
     int fbidx = 0;
-    /**
-    spi_transaction_t datat = {
-        .rx_buffer = NULL,
-        .rxlength = 0,
-        //.tx_buffer = panel,
-        //.length = sizeof(panel) * 8
-    };
-    */
-
     uint8_t panel[226] = { 0x80, 0x00 };
+
     // TBD, assuming 768 bytes in fb (16x16x3)
     // multiple memcpy followed by one SPI transaction vs no copy but 8 SPI transactions?
     // addressing did not work for me so I've memcpy'ing data to the right offsets and
     // sending it in one go
-    fbidx = 0;
+
     if (xSemaphoreTake(spi_bus_mutex, pdMS_TO_TICKS(MAX_SPI_WAIT_MS)) == pdTRUE) {
 
         for (int display = 0; display < 4; display++) {
@@ -116,36 +102,6 @@ void ht16d35a_load_icon(spi_device_handle_t dev, uint8_t *fb, int fblen) {
     }
 }
 
-void ht16d35a_poke(spi_device_handle_t dev) {
-    char off[] = { 0x35, 0x00 };
-    char on[] = { 0x35, 0x03 };
-
-    spi_transaction_t t = {
-        .length = 2 * 8,
-        .tx_buffer = off,
-        .rx_buffer = NULL,
-        .rxlength = 0
-    };
-
-    if (xSemaphoreTake(spi_bus_mutex, pdMS_TO_TICKS(MAX_SPI_WAIT_MS)) == pdTRUE) {
-        for (int ii = 0; ii < 4; ii++) {
-            display_cs(ii, 0);
-            t.tx_buffer = off;
-            ESP_ERROR_CHECK(spi_device_transmit(dev, &t));
-            display_cs(ii, 1);
-        }
-        vTaskDelay(pdMS_TO_TICKS(1));
-        for (int ii = 0; ii < 4; ii++) {
-            display_cs(ii, 0);
-            t.tx_buffer = on;
-            ESP_ERROR_CHECK(spi_device_transmit(dev, &t));
-            display_cs(ii, 1);
-        }
-        xSemaphoreGive(spi_bus_mutex);
-    } else {
-        ESP_LOGE(TAG, "Failed to acquire SPI bus mutex");
-    }
-}
 
 void ht16d35a_tx(spi_device_handle_t dev, char *tx, int tx_len, int display) {
     spi_transaction_t t = {

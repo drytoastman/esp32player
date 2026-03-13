@@ -1,9 +1,12 @@
 
-#include "all.h"
 #include "esp_rom_sys.h"
+#include "esp_log.h"
 #include "driver/spi_master.h"
+#include "board.h"
 
-static const char *TAG = "MAIN";
+#include "all.h"
+
+static const char *TAG = "main";
 
 input_config input_params = {
     .gpio = {
@@ -48,14 +51,21 @@ pi4ioe5v6416_t iox = {
     .address = PI4IOE_ADDR,
 };
 
-stmdev_ctx_t accel = {
+lis2dh12_ctx accel = {
     .address = LIS2DH12_ADDR,
 };
 
 
-spi_device_handle_t ht16d35a;
+spi_device_handle_t display;
 SemaphoreHandle_t spi_bus_mutex;
 i2c_bus_handle_t i2c_bus;
+
+SystemState system_state = {
+    .volume = 0,
+    .baseIcon = "/sdcard/afDCk/CfeVWoQtDUMnxmlOJ8_0TfqlkFsjDtGZZrsVb5A08RI",
+    .displayNumber = 0,
+    .displayTimeout = 0
+};
 
 void shutdown_handler() {
     ESP_LOGI(TAG, "System is shutting down");
@@ -108,19 +118,13 @@ void app_main(void)
     accel.i2c_handle = i2c_bus;
     iox.i2c_handle = i2c_bus;
 
-    digital_init();
-    analog_init();
-
     lis2dh12_init(&accel);
-    ht16d35a_init(&ht16d35a);
+    display_init(&display);
 
-    xTaskCreatePinnedToCore(digital_processor, "digital_processor", 4096, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(analog_processor, "analog_processor", 2048, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(poller_task, "poller", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(rotary_processor, "rotary_processor", 2048, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(nfc_processor, "nfc_processor", 3072, NULL, 5, NULL, 1);
-
-    load_icon("/sdcard/afDCk/CfeVWoQtDUMnxmlOJ8_0TfqlkFsjDtGZZrsVb5A08RI");
     xTaskCreatePinnedToCore(playback_task, "playback_task", 4096, NULL, 5, NULL, 1); // streams will go on 0?
-
     xTaskCreatePinnedToCore(debugio_task, "debugio_task", 4096, NULL, 4, NULL, 1);
 
     //start_wifi();

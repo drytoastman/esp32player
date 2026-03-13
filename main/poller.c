@@ -1,106 +1,51 @@
 
-#include "all.h"
 #include "esp_log.h"
-#include <sys/time.h>
+#include "all.h"
 
 #define VOLUME_MIN 0
 #define VOLUME_MAX 100
 
-static const char *TAG = "digital";
+static const char *TAG = "poller";
 
-void pcactl(bool level) {
-    pi4ioe5v6416_write_pin(&iox, output_params.iox.pactl, level);
-}
-
-void nfc_cs(bool level) {
-    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_cs, level);
-}
-
-void nfc_irq(bool level) {
-    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_irq, level);
-}
-
-bool nfc_irq_check() {
-    return pi4ioe5v6416_read_pin(&iox, input_params.iox.nfc_irq);
-}
-
-void display_cs(int display, bool level) {
-    if ((display < 0) || (display >= 4)) {
-        ESP_LOGE(TAG, "display cs out of range (%d)", display);
-        return;
-    }
-    pi4ioe5v6416_write_pin(&iox, output_params.iox.display[display], level);
-}
-
-
-typedef struct {
-    int pina;
-    int pinb;
-    int state;
-    QueueHandle_t queue;
-} rotary_encoder;
-
-#define DIR_NONE 0x0
-#define DIR_CW 0x10
-#define DIR_CCW 0x20
-#define R_START 0x0
-#define R_CW_FINAL 0x1
-#define R_CW_BEGIN 0x2
-#define R_CW_NEXT 0x3
-#define R_CCW_BEGIN 0x4
-#define R_CCW_FINAL 0x5
-#define R_CCW_NEXT 0x6
-
-const unsigned char ttable[7][4] = {
-  { R_START,    R_CW_BEGIN,  R_CCW_BEGIN, R_START           }, // R_START
-  { R_CW_NEXT,  R_START,     R_CW_FINAL,  R_START | DIR_CW  }, // R_CW_FINAL
-  { R_CW_NEXT,  R_CW_BEGIN,  R_START,     R_START           }, // R_CW_BEGIN
-  { R_CW_NEXT,  R_CW_BEGIN,  R_CW_FINAL,  R_START           }, // R_CW_NEXT
-  { R_CCW_NEXT, R_START,     R_CCW_BEGIN, R_START           }, // R_CCW_BEGIN
-  { R_CCW_NEXT, R_CCW_FINAL, R_START,     R_START | DIR_CCW }, // R_CCW_FINAL
-  { R_CCW_NEXT, R_CCW_FINAL, R_CCW_BEGIN, R_START           }, // R_CCW_NEXT
+adc_oneshot_chan_cfg_t light_sensor_config = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten = ADC_ATTEN_DB_12
 };
 
-static void IRAM_ATTR rotary_isr_handler(void* arg)
-{
-	rotary_encoder *encoder = arg;
+adc_oneshot_chan_cfg_t battery_voltage_config = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten = ADC_ATTEN_DB_12
+};
 
-    int pinstate = (gpio_get_level(encoder->pinb) << 1) | gpio_get_level(encoder->pina);
-    encoder->state = ttable[encoder->state & 0xf][pinstate];
-    int movement = encoder->state & 0x30;
-    if (movement) {
-        xQueueSendFromISR(encoder->queue, &movement, NULL);
-    }
+adc_oneshot_unit_handle_t adc_handle;
+
+// EMA parameters (alpha = 1/2 for light, 1/32 for voltage)
+#define ALPHA_LIGHT_SHIFT 1
+#define ALPHA_VOLT_SHIFT 5
+
+// Oversample count (optional for extra smoothing)
+#define OVERSAMPLE 4
+
+// Global accumulator variables
+static uint32_t voltage_acc = 0;
+static uint32_t light_acc = 0;
+
+// Filtered output
+static uint32_t voltage_filtered = 0;
+static uint32_t light_filtered = 0;
+
+void analog_init() {
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&(adc_oneshot_unit_init_cfg_t) {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE
+    }, &adc_handle));
+
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, analog_params.light_sensor, &light_sensor_config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, analog_params.battery_voltage, &battery_voltage_config));
 }
-
-rotary_encoder rotary_volume;
-rotary_encoder rotary_rightknob;
-
-void rotary_init(rotary_encoder *encoder, int inputA, int inputB)
-{
-    gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_ANYEDGE,    // Interrupt on rising edge, can use GPIO_INTR_NEGEDGE, etc.
-        .mode = GPIO_MODE_INPUT,
-        .pin_bit_mask = (1ULL<<inputA) | (1ULL<<inputB),
-        .pull_down_en = 0,
-        .pull_up_en = 1,
-    };
-    gpio_config(&io_conf);
-
-    encoder->pina = inputA;
-    encoder->pinb = inputB;
-    encoder->state = 0;
-    encoder->queue = xQueueCreate(10, sizeof(int));
-
-    gpio_install_isr_service(0); // default interrupt allocation flag if not already there
-    gpio_isr_handler_add(inputA, rotary_isr_handler, (void*)encoder);
-    gpio_isr_handler_add(inputB, rotary_isr_handler, (void*)encoder);
-}
-
 
 void digital_init()
 {
-    //pi4ioe5v6416_t pi4ioe5v6416_dev;
     pi4ioe5v6416_init(&iox);
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_CONFIG_PORT0,      0x30);
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_CONFIG_PORT1,      0xAF);
@@ -113,9 +58,6 @@ void digital_init()
     vTaskDelay(pdMS_TO_TICKS(1)); // Short delay to ensure pins are set before proceeding with SPI transactions
 
     pcactl(0);
-
-    rotary_init(&rotary_volume, input_params.gpio.volume_a, input_params.gpio.volume_b);
-    //rightknob_pcnt = rotary_init(input_params.gpio.right_a, input_params.gpio.right_b);
 }
 
 
@@ -123,8 +65,11 @@ void digital_init()
  * Task for all the polling junk. A lots of this is the loading of the
  * two registers of the IOX chip and parsing out the individual bits
  */
-void digital_processor(void *ignored)
+void poller_task(void *ignored)
 {
+    digital_init();
+    analog_init();
+
      /* Light sleep is not required to be able to use the PCNT unit, but it can be used to save power between events. */
 #if CONFIG_EXAMPLE_LIGHT_SLEEP
      ESP_LOGI(TAG, "Enabling light sleep. The rotaries task will wake up the chip when an event is detected.");
@@ -133,12 +78,12 @@ void digital_processor(void *ignored)
      ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
 #endif
 
-    int volume = 50;  // TODO, initialize to current volume
     input_config current, previous;  // use as mass organized variables
     uint8_t banka, bankb;
     int both;
     int current_mute = 0;
     time_t power_button_time = time(NULL);
+    uint32_t cycle = 0;
 
     // Initialize previous state of IOX input pins
     pi4ioe5v6416_read_reg(&iox, 0, &banka);
@@ -155,8 +100,6 @@ void digital_processor(void *ignored)
     previous.iox.charge_stat = (both >> input_params.iox.charge_stat) & 0x01;
 
     for (;;) {
-        int measure;
-
         // IOX input pins
         pi4ioe5v6416_read_reg(&iox, 0, &banka);
         pi4ioe5v6416_read_reg(&iox, 1, &bankb);
@@ -220,21 +163,48 @@ void digital_processor(void *ignored)
         }
         previous = current;
 
-        // vTaskDelay(pdMS_TO_TICKS(10));
-        if (xQueueReceive(rotary_volume.queue, &measure, pdMS_TO_TICKS(10)) == pdTRUE) {
-             ESP_LOGI(TAG, "Rotary volume event: %d", measure);
-             if (measure == DIR_CW) {
-                volume++;
-                if (volume > VOLUME_MAX) volume = VOLUME_MAX;
-                ESP_LOGI(TAG, "Volume: %d", volume);
-                playback_inject_event(AUDIO_EVENT_VOLUME, volume);
-            } else if (measure == DIR_CCW) {
-                volume--;
-                if (volume < VOLUME_MIN) volume = VOLUME_MIN;
-                ESP_LOGI(TAG, "Volume: %d", volume);
-                playback_inject_event(AUDIO_EVENT_VOLUME, volume);
+
+        /*********** Analog *********/
+        int measure = 0;
+        cycle++;
+
+        // --- Voltage Sensor ---
+        uint32_t voltage_sum = 0;
+        for (int i = 0; i < OVERSAMPLE; i++) {
+            if (adc_oneshot_read(adc_handle, analog_params.battery_voltage, &measure) == ESP_OK) {
+                voltage_sum += measure;
             }
         }
+        // average oversample
+        measure = voltage_sum / OVERSAMPLE;
+
+        // EMA filter
+        voltage_acc = voltage_acc - (voltage_acc >> ALPHA_VOLT_SHIFT) + measure;
+        voltage_filtered = voltage_acc >> ALPHA_VOLT_SHIFT;
+
+        // --- Light Sensor ---
+        uint32_t light_sum = 0;
+        for (int i = 0; i < OVERSAMPLE; i++) {
+            if (adc_oneshot_read(adc_handle, analog_params.light_sensor, &measure) == ESP_OK) {
+                light_sum += measure;
+            }
+        }
+        measure = light_sum / OVERSAMPLE;
+
+        light_acc = light_acc - (light_acc >> ALPHA_LIGHT_SHIFT) + measure;
+        light_filtered = light_acc >> ALPHA_LIGHT_SHIFT;
+
+        // --- Logging every 64 cycles (~1.28s if delay=20ms) ---
+        if ((cycle % 64) == 0) {
+            ESP_LOGD(TAG, "Light: %u", light_filtered); // 0 - 4095
+            ESP_LOGD(TAG, "Voltage: %u", voltage_filtered);
+
+            int scaled = light_filtered >> 6;
+            //display_brightness(&ht16d35a, scaled ? scaled : 1); // reduce to 1-63 range
+        }
+
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

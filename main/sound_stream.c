@@ -273,7 +273,7 @@ void playback_inject_event(int keypress_cmd, int data) {
     msg.cmd = keypress_cmd;
     msg.data = (void*)data;
     char **intro = (char**)player.pub;
-    ESP_LOGI(TAG, "Inject cmd: %d, data: %d to %p => %p, %p", msg.cmd, data, player.pub, intro[0], intro[1]);
+    ESP_LOGD(TAG, "Inject cmd: %d, data: %d to %p => %p, %p", msg.cmd, data, player.pub, intro[0], intro[1]);
 
     //audio_event_iface_cmd(player.pipeline, &msg);
     audio_event_iface_sendout(player.pub, &msg);
@@ -308,11 +308,9 @@ void playback_task(void* arg) {
 
         if (ret != ESP_OK) {
             // slow down loop on error to avoid taking all the available CPU time
-            ESP_LOGW(TAG, "AudioEventError %d", ret);
             vTaskDelay(pdMS_TO_TICKS(1));
             continue;
         }
-        ESP_LOGW(TAG, "AudioEvent %d from %p", (int)msg.cmd, player.evt);
 
         // Handle music info from decoder
         if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT &&
@@ -349,7 +347,7 @@ void playback_task(void* arg) {
         if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT &&
             msg.source == (void*)0xDEADBEEF) {  // Our custom keypress events
             int data = (int)msg.data;
-            ESP_LOGI(TAG, "Deadbeef event cmd: %d, data: %d", msg.cmd, data);
+            ESP_LOGD(TAG, "Deadbeef event cmd: %d, data: %d", msg.cmd, data);
 
             switch (msg.cmd) {
                 case AUDIO_EVENT_PLAYPAUSE:

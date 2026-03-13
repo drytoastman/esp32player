@@ -41,7 +41,7 @@ void debugio_task(void* arg) {
                     ESP_LOGI(TAG, "Command: %s", (char*)debugio_buffer);
                     switch(debugio_buffer[0]) {
                         case 'b':
-                            ht16d35a_brightness(&ht16d35a, atoi((char*)debugio_buffer + 1)%64);
+                            //display_brightness(&ht16d35a, atoi((char*)debugio_buffer + 1)%64);
                             break;
                         case 'v':
                             playback_inject_event(AUDIO_EVENT_VOLUME, atoi((char*)debugio_buffer + 1)%100);
