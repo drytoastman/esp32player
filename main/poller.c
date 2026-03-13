@@ -34,17 +34,7 @@ static uint32_t light_acc = 0;
 static uint32_t voltage_filtered = 0;
 static uint32_t light_filtered = 0;
 
-void analog_init() {
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&(adc_oneshot_unit_init_cfg_t) {
-        .unit_id = ADC_UNIT_1,
-        .ulp_mode = ADC_ULP_MODE_DISABLE
-    }, &adc_handle));
-
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, analog_params.light_sensor, &light_sensor_config));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, analog_params.battery_voltage, &battery_voltage_config));
-}
-
-void digital_init()
+void poller_init()
 {
     pi4ioe5v6416_init(&iox);
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_CONFIG_PORT0,      0x30);
@@ -55,9 +45,15 @@ void digital_init()
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_PULL_DIR_PORT1,    0xA8);
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_OUTPUT_PORT0,      0xFF);
     pi4ioe5v6416_write_reg(&iox, PI4IOE5V6416_OUTPUT_PORT1,      0xFF);
-    vTaskDelay(pdMS_TO_TICKS(1)); // Short delay to ensure pins are set before proceeding with SPI transactions
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.pactl,           0);  // make sure PA is off at startup
 
-    pcactl(0);
+
+    adc_oneshot_new_unit(&(adc_oneshot_unit_init_cfg_t) {
+        .unit_id = ADC_UNIT_1,
+        .ulp_mode = ADC_ULP_MODE_DISABLE
+    }, &adc_handle);
+    adc_oneshot_config_channel(adc_handle, analog_params.light_sensor, &light_sensor_config);
+    adc_oneshot_config_channel(adc_handle, analog_params.battery_voltage, &battery_voltage_config);
 }
 
 
@@ -67,9 +63,6 @@ void digital_init()
  */
 void poller_task(void *ignored)
 {
-    digital_init();
-    analog_init();
-
      /* Light sleep is not required to be able to use the PCNT unit, but it can be used to save power between events. */
 #if CONFIG_EXAMPLE_LIGHT_SLEEP
      ESP_LOGI(TAG, "Enabling light sleep. The rotaries task will wake up the chip when an event is detected.");
@@ -81,7 +74,6 @@ void poller_task(void *ignored)
     input_config current, previous;  // use as mass organized variables
     uint8_t banka, bankb;
     int both;
-    int current_mute = 0;
     time_t power_button_time = time(NULL);
     uint32_t cycle = 0;
 
@@ -99,7 +91,7 @@ void poller_task(void *ignored)
     previous.iox.plug_stat   = (both >> input_params.iox.plug_stat) & 0x01;
     previous.iox.charge_stat = (both >> input_params.iox.charge_stat) & 0x01;
 
-    for (;;) {
+    while (true) {
         // IOX input pins
         pi4ioe5v6416_read_reg(&iox, 0, &banka);
         pi4ioe5v6416_read_reg(&iox, 1, &bankb);
@@ -115,24 +107,12 @@ void poller_task(void *ignored)
         current.iox.charge_stat = (both >> input_params.iox.charge_stat) & 0x01;
 
         if (current.iox.volume != previous.iox.volume) {
-            ESP_LOGI(TAG, "IOX Volume pin changed to: %d", current.iox.volume);
-
-            if (!current.iox.volume) {
-                current_mute = !current_mute; // Toggle mute state
-                if (!current_mute) { // inverted
-                    ESP_LOGI(TAG, "Muting audio");
-                    pcactl(0);
-                } else {
-                    ESP_LOGI(TAG, "Unmuting audio");
-                    pcactl(1);
-                }
-            }
+            ESP_LOGD(TAG, "IOX Volume pin changed to: %d", current.iox.volume);
+            gct_send(APP_LEFT_BUTTON, 0, current.iox.volume);
         }
         if (current.iox.right != previous.iox.right) {
-            ESP_LOGI(TAG, "IOX Right pin changed to: %d", current.iox.right);
-            if (current.iox.right) {
-                playback_inject_event(AUDIO_EVENT_PLAYPAUSE, 0);
-            }
+            ESP_LOGD(TAG, "IOX Right pin changed to: %d", current.iox.right);
+            gct_send(APP_RIGHT_BUTTON, 0, current.iox.right);
         }
 
         if (current.iox.power) {
@@ -140,10 +120,10 @@ void poller_task(void *ignored)
         } else {
             // If power button is held for more than 5 seconds, trigger a reset, power circuit will turn off
             if (time(NULL) - power_button_time > 5) {
-                ESP_LOGI(TAG, "Power button held for more than 5 seconds, shutting down");
-                esp_restart();
+                gct_send(APP_POWER_BUTTON, 0, 0);
             }
         }
+
         // current.iox.nfc_irq
         // This is polled by the nfc_irq_check function, so we don't need to log it here and it gets noisy
 
@@ -153,16 +133,18 @@ void poller_task(void *ignored)
             ESP_LOGI(TAG, "IOX HP Detect pin changed to: %d", current.iox.hp_detect);
         }
         if (current.iox.tilt != previous.iox.tilt) {
-            ESP_LOGI(TAG, "IOX Tilt pin changed to: %d", current.iox.tilt);
+            gct_send(APP_TILT, 0, current.iox.tilt);
+            ESP_LOGD(TAG, "IOX Tilt pin changed to: %d", current.iox.tilt);
         }
         if (current.iox.plug_stat != previous.iox.plug_stat) {
-            ESP_LOGI(TAG, "IOX Plug Stat pin changed to: %d", current.iox.plug_stat);
+            gct_send(APP_PLUG, 0, current.iox.plug_stat);
+            ESP_LOGD(TAG, "IOX Plug Stat pin changed to: %d", current.iox.plug_stat);
         }
         if (current.iox.charge_stat != previous.iox.charge_stat) {
-            ESP_LOGI(TAG, "IOX Charge Stat pin changed to: %d", current.iox.charge_stat);
+            gct_send(APP_CHARGE, 0, current.iox.plug_stat);
+            ESP_LOGD(TAG, "IOX Charge Stat pin changed to: %d", current.iox.charge_stat);
         }
         previous = current;
-
 
         /*********** Analog *********/
         int measure = 0;
@@ -196,15 +178,12 @@ void poller_task(void *ignored)
 
         // --- Logging every 64 cycles (~1.28s if delay=20ms) ---
         if ((cycle % 64) == 0) {
-            ESP_LOGD(TAG, "Light: %u", light_filtered); // 0 - 4095
-            ESP_LOGD(TAG, "Voltage: %u", voltage_filtered);
-
-            int scaled = light_filtered >> 6;
-            //display_brightness(&ht16d35a, scaled ? scaled : 1); // reduce to 1-63 range
+            gct_send(APP_BATTERY, 0, voltage_filtered);
+            gct_send(APP_LIGHT, 0, light_filtered);
         }
 
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 

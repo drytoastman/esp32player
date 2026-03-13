@@ -18,13 +18,17 @@
 #define WIDTH 16
 #define HEIGHT 16
 
-extern const uint8_t numberoverlagy[];
-
 static const char *TAG = "images";
-EXT_RAM_BSS_ATTR uint8_t  icon6[WIDTH * HEIGHT * 3]; // RGB666 framebuffer
-EXT_RAM_BSS_ATTR uint8_t icon32[WIDTH * HEIGHT * 4]; // RGBA8888 framebuffer
+
+EXT_RAM_BSS_ATTR uint8_t       fb6[WIDTH * HEIGHT * 3]; // RGB666 framebuffer
+EXT_RAM_BSS_ATTR uint8_t    base32[WIDTH * HEIGHT * 4]; // RGBA8888 framebuffer
 EXT_RAM_BSS_ATTR uint8_t lodespace[512 * 512 * 4]; // temporary space for lodepng (RGBA8888)
+
 static int lodespace_offset = 0;
+static int active_number = -1;
+static const uint8_t *active_overlay = NULL;
+static uint8_t *active_base = NULL;
+
 
 void *malloc_lodepng(size_t size) {
     if (lodespace_offset + size > sizeof(lodespace)) {
@@ -82,6 +86,7 @@ void scale_image_nearest_neighbor(uint8_t* src, int src_w, int src_h,
  */
 void process_image_32to6(uint8_t *infb, const uint8_t *overlay, int width, int height, bool srgb, uint8_t *outfb) {
     float bg_r = 0, bg_g = 0, bg_b = 0; // black background
+    float or   = 0, og   = 0, ob   = 0, oa = 0; // no overlay
 
     for (int ii = 0, jj = 0; ii < width * height * 4; ii+=4, jj+=3) {
         float lr = infb[ii]   / 255.0f;  // 8bit to float
@@ -89,19 +94,23 @@ void process_image_32to6(uint8_t *infb, const uint8_t *overlay, int width, int h
         float lb = infb[ii+2] / 255.0f;
         float la = infb[ii+3] / 255.0f;
 
-        float or = overlay[ii]   / 255.0f;  // 8bit to float
-        float og = overlay[ii+1] / 255.0f;
-        float ob = overlay[ii+2] / 255.0f;
-        float oa = overlay[ii+3] / 255.0f;
+        if (overlay) {
+            or = overlay[ii]   / 255.0f;  // 8bit to float
+            og = overlay[ii+1] / 255.0f;
+            ob = overlay[ii+2] / 255.0f;
+            oa = overlay[ii+3] / 255.0f;
+        }
 
         if (srgb) {
             lr = srgb_to_linear(lr);
             lg = srgb_to_linear(lg);
             lb = srgb_to_linear(lb);
 
-            or = srgb_to_linear(or);
-            og = srgb_to_linear(og);
-            ob = srgb_to_linear(ob);
+            if (overlay) {
+                or = srgb_to_linear(or);
+                og = srgb_to_linear(og);
+                ob = srgb_to_linear(ob);
+            }
         }
 
         // Alpha blend: result = foreground * alpha + background * (1 - alpha)
@@ -109,10 +118,12 @@ void process_image_32to6(uint8_t *infb, const uint8_t *overlay, int width, int h
         lg = (lg * la + bg_g * (1 - la));
         lb = (lb * la + bg_b * (1 - la));
 
-        // Add the overlay
-        lr = (or * oa + lr * (1 - oa));
-        lg = (og * oa + lg * (1 - oa));
-        lb = (ob * oa + lb * (1 - oa));
+        if (overlay) {
+            // Composite the overlay on top of the base image
+            lr = (or * oa + lr * (1 - oa));
+            lg = (og * oa + lg * (1 - oa));
+            lb = (ob * oa + lb * (1 - oa));
+        }
 
         outfb[jj]   = (uint8_t)(lr * 63.0); // float to 6bit
         outfb[jj+1] = (uint8_t)(lg * 63.0);
@@ -166,11 +177,21 @@ void draw_number(uint8_t *icon6, int number, int width, int height) {
 }
 
 
-esp_err_t load_icon(char *path) {
+void images_send_to_display() {
+
+    process_image_32to6(active_base, active_overlay, WIDTH, HEIGHT, true, fb6);
+
+    draw_number(fb6, active_number, WIDTH, HEIGHT);
+
+    display_load_fb(display, fb6, WIDTH * HEIGHT * 3);
+}
+
+
+
+esp_err_t images_set_base(char *path) {
     int original_width, original_height;
     lodespace_offset = 0; // reset lodepng buffer
     uint8_t *original = NULL;
-    uint8_t *scaled = icon32;
 
     int ret = lodepng_decode32_file(&original, (unsigned*)&original_width, (unsigned*)&original_height, path);
     if (ret) {
@@ -181,43 +202,37 @@ esp_err_t load_icon(char *path) {
     if (original_height != HEIGHT || original_width != WIDTH) {
         ESP_LOGI(TAG, "Scaling image from %dx%d to %dx%d", original_width, original_height, WIDTH, HEIGHT);
         scale_image_nearest_neighbor(original, original_width, original_height,
-                                     icon32, WIDTH, HEIGHT, 4);
-        scaled = icon32;
+                                     base32, WIDTH, HEIGHT, 4);
+        active_base = base32;
     } else {
-        scaled = original; // no scaling needed, can process in-place
+        active_base = original; // no scaling needed, can process in-place
     }
 
-    process_image_32to6(scaled, numberoverlagy, WIDTH, HEIGHT, true, icon6);
-
-    draw_number(icon6, system_state.volume, WIDTH, HEIGHT);
-
-    #ifdef EXTERNAL
-    // For debugging: save the processed framebuffer back to a PNG (will be 6-bit color but still in 8-bit channels)
-    FILE *fp = fopen("outicon.data", "wb");
-    if (fp) {
-        fwrite(icon6, 1, WIDTH * HEIGHT * 3, fp);
-        fclose(fp);
-        ESP_LOGI(TAG, "Saved processed icon to outicon.data");
-    } else {
-        ESP_LOGE(TAG, "Failed to open file for saving processed icon");
-    }
-    #else
-        display_load_fb(display, icon6, WIDTH * HEIGHT * 3);
-    #endif
-
+    images_send_to_display();
     return ESP_OK;
 }
 
 
-#ifdef EXTERNAL
-int main() {
-    return load_icon("icon.png");
+void images_set_overlay(uint8_t *overlay) {
+    active_overlay = overlay;
+    images_send_to_display();
 }
-#endif
+
+
+void images_set_number(int number) {
+    active_number = number;
+    if (number > 5 && number < 100) {
+        active_overlay = numberoverlay;
+    } else {
+        active_overlay = NULL;
+    }
+    images_send_to_display();
+}
+
 
 // Provide an overlay with a 10x10 black area to 'write' our display numbers on to
 // alpha gradient the outer area to let some of the 'background' through
-const uint8_t numberoverlagy[WIDTH * HEIGHT * 4] = {
+const uint8_t numberoverlay[WIDTH * HEIGHT * 4] = {
   "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
   "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\033\000\000\000\033"
   "\000\000\000\033\000\000\000\033\000\000\000\033\000\000\000\033\000\000\000\033\000\000\000\033\000\000\000\033\000\000\000\033"

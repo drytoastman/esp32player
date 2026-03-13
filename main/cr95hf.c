@@ -52,6 +52,19 @@
 
 static char *TAG = "cr95hf";
 
+void nfc_cs(bool level) {
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_cs, level);
+}
+
+void nfc_irq(bool level) {
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.nfc_irq, level);
+}
+
+bool nfc_irq_check() {
+    return pi4ioe5v6416_read_pin(&iox, input_params.iox.nfc_irq);
+}
+
+
 void cr95hf_init(spi_device_handle_t *dev) {
     ESP_LOGI(TAG, "Add device");
 

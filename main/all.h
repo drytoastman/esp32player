@@ -25,6 +25,11 @@ void display_init(spi_device_handle_t *dev);
 void display_brightness(spi_device_handle_t *dev, uint8_t level);
 void display_load_fb(spi_device_handle_t dev, uint8_t *buf, int buf_len);
 
+// images
+extern const uint8_t numberoverlay[];
+esp_err_t images_set_base(char *path);
+void images_set_overlay(uint8_t *overlay);
+void images_set_number(int number);
 
 // cr95hf
 void cr95hf_init(spi_device_handle_t *dev);
@@ -77,17 +82,6 @@ typedef struct {
 } output_cfg;
 
 
-typedef struct {
-
-    int volume;
-    char *baseIcon;
-    int displayNumber;
-    time_t displayTimeout;  // <=0 for not on, > 0 for on
-
-} SystemState;
-
-
-extern SystemState system_state;
 extern input_config input_params;
 extern analog_config analog_params;
 extern output_cfg output_params;
@@ -95,28 +89,30 @@ extern pi4ioe5v6416_t iox;
 extern spi_device_handle_t display;
 extern SemaphoreHandle_t spi_bus_mutex;
 
-
 #define MAX_SPI_WAIT_MS 100
 #define MOUNT_POINT "/sdcard"
 
 void mount_sdcard();
 
-void rotary_processor(void *ignored);
+// rotary
+#define DIR_NONE 0x0
+#define DIR_CW 0x10
+#define DIR_CCW 0x20
+void rotary_init();
+
+// poller
+void poller_init();
 void poller_task(void *ignored);
 
+// nfc
 void nfc_processor(void *ignored);
 
+
 esp_err_t load_icon(char *path);
-
-void pcactl(bool level);
-void nfc_cs(bool level);
-void nfc_irq(bool level);
-bool nfc_irq_check();
-void display_cs(int display, bool level);
-
 void start_wifi(void);
 void start_webserver();
 
+// playback
 #define AUDIO_EVENT_PLAYPAUSE 201
 #define AUDIO_EVENT_NEXT 202
 #define AUDIO_EVENT_PREV 203
@@ -126,8 +122,33 @@ void start_webserver();
 void playback_task(void *ignored);
 void playback_inject_event(int keypress_cmd, int data);
 
+// debugio
 void debugio_task(void* arg);
 
 
+#define APP_ROTARY_VOLUME 301
+#define APP_ROTARY_TRACK  302
+#define APP_LEFT_BUTTON   303
+#define APP_RIGHT_BUTTON  304
+#define APP_POWER_BUTTON  305
+#define APP_TILT          306
+#define APP_HEADPHONE     307
+#define APP_POWER         308
+#define APP_PLUG          309
+#define APP_CHARGE        310
+#define APP_BATTERY       311
+#define APP_LIGHT         312
+
+// GCT - Grand Central Task
+typedef struct {
+    int event_type;
+    int id;
+    int data;
+} app_event;
+
+void gct_init();
+void grand_central_task(void *ignored);
+void gct_send(int event_type, int id, int data);
+void gct_send_isr(int event_type, int id, int data);
 
 #endif

@@ -16,6 +16,13 @@ Set system control
 void ht16d35a_tx(spi_device_handle_t dev, char *tx, int tx_len, int display);
 void ht16d35a_rx(spi_device_handle_t dev, char *rx, int *rx_len, int display);
 
+void display_cs(int display, bool level) {
+    if ((display < 0) || (display >= 4)) {
+        ESP_LOGE(TAG, "display cs out of range (%d)", display);
+        return;
+    }
+    pi4ioe5v6416_write_pin(&iox, output_params.iox.display[display], level);
+}
 
 void display_init(spi_device_handle_t *dev) {
     ESP_LOGI(TAG, "Add device");
@@ -123,7 +130,6 @@ void ht16d35a_tx(spi_device_handle_t dev, char *tx, int tx_len, int display) {
 
 
 void ht16d35a_rx(spi_device_handle_t dev, char *rx, int *rx_len, int display) {
-    int response_code;
     char read[2] = {0x81, 0x00};
     char output[60];
 

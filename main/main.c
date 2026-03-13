@@ -60,12 +60,6 @@ spi_device_handle_t display;
 SemaphoreHandle_t spi_bus_mutex;
 i2c_bus_handle_t i2c_bus;
 
-SystemState system_state = {
-    .volume = 0,
-    .baseIcon = "/sdcard/afDCk/CfeVWoQtDUMnxmlOJ8_0TfqlkFsjDtGZZrsVb5A08RI",
-    .displayNumber = 0,
-    .displayTimeout = 0
-};
 
 void shutdown_handler() {
     ESP_LOGI(TAG, "System is shutting down");
@@ -93,7 +87,7 @@ void app_main(void)
         .quadhd_io_num = -1,
         .max_transfer_sz = 0 // cr95h can send up to 528 bytes of data
     };
-    ESP_ERROR_CHECK(spi_bus_initialize(VSPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    spi_bus_initialize(VSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     spi_bus_mutex = xSemaphoreCreateMutex();
     if (spi_bus_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create SPI bus mutex");
@@ -118,14 +112,18 @@ void app_main(void)
     accel.i2c_handle = i2c_bus;
     iox.i2c_handle = i2c_bus;
 
+    gct_init();
+    rotary_init();
+    poller_init();
     lis2dh12_init(&accel);
-    display_init(&display);
+    display_init(&display);  // requires poller_init for using IOX chip selects
 
-    xTaskCreatePinnedToCore(poller_task, "poller", 4096, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(rotary_processor, "rotary_processor", 2048, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(nfc_processor, "nfc_processor", 3072, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(playback_task, "playback_task", 4096, NULL, 5, NULL, 1); // streams will go on 0?
-    xTaskCreatePinnedToCore(debugio_task, "debugio_task", 4096, NULL, 4, NULL, 1);
+    xTaskCreatePinnedToCore(grand_central_task, "gct",      4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(poller_task,        "poller",   4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(nfc_processor,      "nfc",      3072, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(playback_task,      "playback", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(debugio_task,       "debugio",  4096, NULL, 4, NULL, 1);
+    // audio stuff (decoder, etc) put themselves on CPU 0
 
     //start_wifi();
     //start_webserver();

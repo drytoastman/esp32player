@@ -91,7 +91,7 @@ esp_err_t upload_post_handler(httpd_req_t *req)
             gamma = atof(param);
     }
 
-    ESP_LOGI("HTTP", "srgb=%d led=%d R=%.2f G=%.2f B=%.2f Gamma=%.2f",
+    ESP_LOGI(TAG, "srgb=%d led=%d R=%.2f G=%.2f B=%.2f Gamma=%.2f",
              srgb, led, redScale, greenScale, blueScale, gamma);
 
     int total_len = req->content_len;
