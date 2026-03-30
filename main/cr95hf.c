@@ -7,6 +7,7 @@
 #define CMD_IDN 0x01
 #define CMD_PROTOCOL 0x02
 #define CMD_SENDRECV 0x04
+#define CMD_WRREG 0x09
 #define CMD_ECHO 0x55
 
 // Response Codes
@@ -33,7 +34,7 @@
 #define ISO14443A_NVB_ANTICOLL 0x20
 #define ISO14443A_NVB_SELECT 0x70
 #define ISO14443A_READ 0x30
-#define ISO14443A_WRITE 0xA0
+#define ISO14443A_WRITE 0xA2
 #define ISO14443A_HALT 0x50
 
 #define ISO14443A_KEYA 0x60
@@ -65,6 +66,20 @@ bool nfc_irq_check() {
 }
 
 
+void cr95hf_poke() {
+    nfc_irq(0);
+    esp_rom_delay_us(20);
+    nfc_irq(1);
+}
+
+void cr95hf_wait() {
+    while (1) {
+        if (!nfc_irq_check()) break; // NFC irq_out went low
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+
 void cr95hf_init(spi_device_handle_t *dev) {
     ESP_LOGI(TAG, "Add device");
 
@@ -77,20 +92,6 @@ void cr95hf_init(spi_device_handle_t *dev) {
 
     // 'wake' NFC chip
     cr95hf_poke();
-}
-
-
-void cr95hf_poke() {
-    nfc_irq(0);
-    esp_rom_delay_us(20);
-    nfc_irq(1);
-}
-
-void cr95hf_wait() {
-    while (1) {
-        if (!nfc_irq_check()) break; // NFC irq_out went low
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
 }
 
 
@@ -115,7 +116,7 @@ void cr95hf_tx(spi_device_handle_t dev, uint8_t *tx, int tx_len) {
 
 
 // char buf[530];
-esp_err_t cr95hf_rx(spi_device_handle_t dev, uint8_t *rx, int *rx_len) {
+esp_err_t cr95hf_rx(spi_device_handle_t dev, uint8_t *rx, int *rx_len, bool skiperror) {
     esp_err_t response_code = ESP_OK;
     int response_length;
     uint8_t read[1] = {SPI_READ};
@@ -159,12 +160,11 @@ esp_err_t cr95hf_rx(spi_device_handle_t dev, uint8_t *rx, int *rx_len) {
                     response_code = err;
                 }
             } else {
-                ESP_LOGE(TAG, "Buffer %d too small for response %d", response_length, *rx_len);
+                ESP_LOGE(TAG, "Buffer %d too small for response %d", *rx_len, response_length);
                 response_code = ESP_ERR_NO_MEM;
             }
         } else {
-            // ESP_LOGE(TAG, "Error response 0x%X", response_code);
-            // noisy when polling and expecting 0x87
+            if (!skiperror) ESP_LOGE(TAG, "Error response 0x%X", response_code);
         }
 
         nfc_cs(1);
@@ -185,7 +185,7 @@ void cr95hf_info(spi_device_handle_t dev) {
 
     uint8_t in[16];
     int datalen = sizeof(in);
-    cr95hf_rx(dev, in, &datalen);
+    cr95hf_rx(dev, in, &datalen, false);
 
     ESP_LOGI(TAG, "cr95hf_info (%d) '%s'", datalen, in);
 }
@@ -199,7 +199,25 @@ void cr95hf_protocol(spi_device_handle_t dev) {
 
     uint8_t in[16];
     int datalen = sizeof(in);
-    cr95hf_rx(dev, in, &datalen);
+    cr95hf_rx(dev, in, &datalen, false);
+}
+
+
+void cr95hf_adjust(spi_device_handle_t dev, uint8_t arcb, uint8_t tw) {
+    uint8_t in[16];
+    int datalen = sizeof(in);
+
+    ESP_LOGI(TAG, "ARC-B = %02X", arcb);
+    uint8_t arccmd[] = { 0, CMD_WRREG, 4, 0x68, 0x00, 0x01, arcb };  // ARC-B
+    cr95hf_tx(dev, arccmd, sizeof(arccmd));
+    cr95hf_wait();
+    cr95hf_rx(dev, in, &datalen, false);
+
+    ESP_LOGI(TAG, "TimerW = %02X", tw);
+    uint8_t twcmd[] = { 0, CMD_WRREG, 4, 0x3A, 0x00, tw, 0x04 };  // TimerW
+    cr95hf_tx(dev, twcmd, sizeof(twcmd));
+    cr95hf_wait();
+    cr95hf_rx(dev, in, &datalen, false);
 }
 
 
@@ -213,7 +231,7 @@ esp_err_t cr95hf_poll(spi_device_handle_t dev, bool wake_up, uint8_t *atqa, int 
     cr95hf_tx(dev, reqwup, sizeof(reqwup));
     cr95hf_wait();
 
-    return cr95hf_rx(dev, atqa, atqalen); // expect back ATQA(44 00) CRCOK 00 00
+    return cr95hf_rx(dev, atqa, atqalen, true); // expect back ATQA(44 00) CRCOK 00 00
 }
 
 
@@ -232,7 +250,7 @@ esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, in
     cr95hf_wait();
 
     buflen = sizeof(inbuf);
-    err = cr95hf_rx(dev, inbuf, &buflen); // expect back ISO14443A_CT U1 U2 U3 BCC CRCOK 00 00
+    err = cr95hf_rx(dev, inbuf, &buflen, false); // expect back ISO14443A_CT U1 U2 U3 BCC CRCOK 00 00
     if (err) return err;
     if (*uidlen >= 3) {
         memcpy(uid, &inbuf[1], 3);
@@ -246,7 +264,7 @@ esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, in
     cr95hf_wait();
 
     buflen = sizeof(inbuf);
-    err = cr95hf_rx(dev, inbuf, &buflen); // expect SAK(04) CRC_A (DA 17) OK 00 00
+    err = cr95hf_rx(dev, inbuf, &buflen, false); // expect SAK(04) CRC_A (DA 17) OK 00 00
     ESP_LOGI(TAG, "SAK = 0x%X", inbuf[0]);
     if (err)  return err;
 
@@ -257,7 +275,7 @@ esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, in
     cr95hf_wait();
 
     buflen = sizeof(inbuf);
-    err = cr95hf_rx(dev, inbuf, &buflen); // expect U4 (no cascade) U5 U6 U7 U8 CRCOK 00 00
+    err = cr95hf_rx(dev, inbuf, &buflen, false); // expect U4 (no cascade) U5 U6 U7 U8 CRCOK 00 00
     if (err) return err;
     if (*uidlen >= 8) {
         memcpy(&uid[3], inbuf, 5);
@@ -273,17 +291,34 @@ esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, in
     cr95hf_wait();
 
     buflen = sizeof(inbuf);
-    return cr95hf_rx(dev, inbuf, &buflen); // expect SAK(00) CRC_A(FE 51) OK 00 00
+    return cr95hf_rx(dev, inbuf, &buflen, false); // expect SAK(00) CRC_A(FE 51) OK 00 00
 }
 
 
-esp_err_t cr95hf_read(spi_device_handle_t dev, int pagestart, uint8_t *inbuf, int *inbuflen) {
-    // Read page
+esp_err_t cr95hf_read(spi_device_handle_t dev, int pagestart, uint8_t *outbuf, int *outbuflen) {
+    // Read page(s)
     uint8_t read[] = { SPI_WRITE, CMD_SENDRECV, 0x03, ISO14443A_READ, pagestart, FLAG_STD_CRC };
     cr95hf_tx(dev, read, sizeof(read));
     cr95hf_wait();
 
-    return cr95hf_rx(dev, inbuf, inbuflen);
+    return cr95hf_rx(dev, outbuf, outbuflen, false);
+}
+
+
+esp_err_t cr95hf_write4(spi_device_handle_t dev, uint8_t pagestart, uint8_t *fourbytes) {
+    // Write page
+    ESP_LOGI(TAG, "WRITE %02X: %02X %02X %02X %02X", pagestart, fourbytes[0], fourbytes[1], fourbytes[2], fourbytes[3]);
+
+    uint8_t write[] = { SPI_WRITE, CMD_SENDRECV, 0x07, ISO14443A_WRITE, pagestart, 0, 0, 0, 0, FLAG_STD_CRC };
+    memcpy(&write[5], fourbytes, 4); // copy the 4 bytes to write
+    cr95hf_tx(dev, write, sizeof(write));
+    cr95hf_wait();
+
+    uint8_t ack[4];
+    int len = sizeof(ack);
+    esp_err_t ret = cr95hf_rx(dev, ack, &len, false); // expect ACK CRC_A OK 00 00
+    ESP_LOGI(TAG, "WRITE RET %02X %02X %02X %02X", ack[0], ack[1], ack[2], ack[3]);
+    return ret;
 }
 
 
@@ -296,5 +331,5 @@ esp_err_t cr95hf_halt(spi_device_handle_t dev)
 
     uint8_t result[8];
     int len = sizeof(result);
-    return cr95hf_rx(dev, result, &len);
+    return cr95hf_rx(dev, result, &len, false);
 }

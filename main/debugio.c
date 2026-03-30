@@ -58,6 +58,11 @@ void debugio_task(void* arg) {
                         case 's':
                             playback_inject_event(AUDIO_EVENT_SET_TRACK, atoi((char*)debugio_buffer + 1));
                             break;
+                        case 'N':
+                            uint8_t arcb = strtol((char*)debugio_buffer + 1, NULL, 16);
+                            uint8_t tw   = strtol((char*)debugio_buffer + 4, NULL, 16);
+                            nfc_adjust(arcb, tw);
+                            break;
                         default:
                             ESP_LOGW(TAG, "Unknown command: %s", (char*)debugio_buffer);
                     }

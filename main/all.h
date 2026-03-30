@@ -31,16 +31,11 @@ esp_err_t images_set_base(char *path);
 void images_set_overlay(uint8_t *overlay);
 void images_set_number(int number);
 
-// cr95hf
-void cr95hf_init(spi_device_handle_t *dev);
-void cr95hf_poke();
-void cr95hf_wait();
-void cr95hf_info(spi_device_handle_t dev);
-void cr95hf_protocol(spi_device_handle_t dev);
-esp_err_t cr95hf_poll(spi_device_handle_t dev, bool wake_up, uint8_t *atqa, int *atqalen);
-esp_err_t cr95hf_select(spi_device_handle_t dev, uint8_t *atqa, uint8_t *uid, int *uidlen);
-esp_err_t cr95hf_read(spi_device_handle_t dev, int page_start, uint8_t *inbuf, int *inbuflen);
-esp_err_t cr95hf_halt(spi_device_handle_t dev);
+// cr95hf, nfc
+void nfc_processor(void *ignored);
+void nfc_init();
+esp_err_t nfc_write(uint8_t page, uint8_t data[4]);
+esp_err_t nfc_adjust(uint8_t arcb, uint8_t tw);
 
 
 typedef struct {
@@ -103,9 +98,6 @@ void rotary_init();
 // poller
 void poller_init();
 void poller_task(void *ignored);
-
-// nfc
-void nfc_processor(void *ignored);
 
 
 esp_err_t load_icon(char *path);

@@ -115,6 +115,8 @@ void app_main(void)
     gct_init();
     rotary_init();
     poller_init();
+    nfc_init();
+
     lis2dh12_init(&accel);
     display_init(&display);  // requires poller_init for using IOX chip selects
 

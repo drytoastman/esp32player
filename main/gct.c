@@ -78,7 +78,7 @@ void grand_central_task(void *ignored) {
             continue;
         }
 
-        ESP_LOGI(TAG, "Received event: type=%d, id=%d, data=%d", event.event_type, event.id, event.data);
+        ESP_LOGD(TAG, "Received event: type=%d, id=%d, data=%d", event.event_type, event.id, event.data);
         // Process the event based on its type and data
         // For example:
         switch (event.event_type) {
@@ -128,6 +128,10 @@ void grand_central_task(void *ignored) {
             case APP_RIGHT_BUTTON:
                 // Handle right button event, using event.data as the button state (pressed/released)
                 ESP_LOGI(TAG, "Right button state: %d", event.data);
+                if (event.data) { // pressed
+                    uint8_t data[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+                    nfc_write(17, data); // for testing, remove later
+                }
                 break;
 
 
